@@ -99,7 +99,7 @@ function ingestPickups() {
   var cfg = getCfg_(), props = PropertiesService.getScriptProperties();
   var q = cfg.PICKUP_QUERY || 'from:no-reply@brinksinc.com subject:"Pick up and Delivery" has:attachment newer_than:30d';
   var sh = desk2Tab_(DESK2.PICK, DESK2.PICK_H), have = {}, added = 0;
-  sh.getDataRange().getValues().slice(1).forEach(function (r) { have[r[0] + '|' + (r[1] instanceof Date ? r[1].getTime() : r[1])] = 1; });
+  sh.getDataRange().getValues().slice(1).forEach(function (r) { if (r[1] instanceof Date) have[r[0] + '|' + Math.floor(r[1].getTime() / 60000)] = 1; });
   var take = function (blob, name) {
     var add = desk2ParsePickups_(xlsxToValues_(blob, name), have);
     if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, add[0].length).setValues(add);
@@ -115,26 +115,53 @@ function ingestPickups() {
   var it = folderByPath_('Brinks Recon/Brinks Pickups', true).getFiles();
   while (it.hasNext()) {
     var f = it.next(), key = 'pkf_' + f.getId() + '_' + f.getLastUpdated().getTime();
-    if (!/\.xlsx?$/i.test(f.getName()) || props.getProperty(key)) continue;
-    take(f.getBlob(), f.getName()); props.setProperty(key, '1');
+    if (!/\.(xlsx?|txt)$/i.test(f.getName()) || props.getProperty(key)) continue;
+    if (/\.txt$/i.test(f.getName())) {
+      var add = desk2ParseCompact_(f.getBlob().getDataAsString(), have);
+      if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, add[0].length).setValues(add);
+      added += add.length;
+    } else take(f.getBlob(), f.getName());
+    props.setProperty(key, '1');
   }
   if (added) logRun('Pickups ingested: ' + added + ' bag rows');
   return added;
 }
 function desk2ParsePickups_(rows, have) {
   var hr = -1;
-  for (var r = 0; r < Math.min(rows.length, 20); r++) if (rows[r].map(String).indexOf('Bag/Order Number') >= 0) { hr = r; break; }
+  for (var r = 0; r < Math.min(rows.length, 20); r++) { var hh = rows[r].map(function (x) { return String(x).trim(); }); if (hh.indexOf('Store ID') >= 0 && hh.some(function (x) { return /^Bag\//.test(x); })) { hr = r; break; } }
   if (hr < 0) throw new Error('Pickup report header not found');
   var h = rows[hr].map(function (x) { return String(x).trim(); }), c = function (n) { return h.indexOf(n); };
-  var iD = c('Date'), iS = c('Store ID'), iL = c('Location Name'), iB = c('Bag/Order Number'), iT = c('Transaction Type'), now = new Date(), out = [];
+  var iD = c('Date'), iS = c('Store ID'), iL = c('Location Name'), iB = h.findIndex(function (x) { return /^Bag\//.test(x); }), iT = c('Transaction Type'), now = new Date(), out = [];
   for (var k = hr + 1; k < rows.length; k++) {
     var x = rows[k], bag = String(x[iB] || '').trim();
     if (!bag || !(x[iD] instanceof Date)) continue;
-    var key = bag + '|' + x[iD].getTime();
+    var key = bag + '|' + Math.floor(x[iD].getTime() / 60000);
     if (have[key]) continue;
     have[key] = 1;
     out.push([bag, x[iD], String(x[iS]).trim(), String(x[iL] || ''), String(x[iT] || ''), now]);
   }
+  return out;
+}
+
+/** Compact history file (PUv1: "yyyy-MM-dd HH:mm:ss<TAB>Store ID<TAB>P|D<TAB>bag prefix<TAB>suffixes / ranges"). */
+function desk2ParseCompact_(txt, have) {
+  var lines = String(txt).split(/\r?\n/), out = [], now = new Date();
+  if (lines[0].trim() !== 'PUv1') throw new Error('Unknown pickup history format');
+  lines.slice(1).forEach(function (ln) {
+    if (!ln.trim()) return;
+    var p = ln.split('\t'), m = p[0].match(/(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+    var t = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]), type = p[2] === 'D' ? 'Delivery' : 'Pickup';
+    p[4].split(',').forEach(function (part) {
+      var r = part.match(/^(\d+)-(\d+)(.*)$/), bags = [];
+      if (r) { for (var n = +r[1]; n <= +r[2]; n++) bags.push(p[3] + ('0000000000' + n).slice(-r[1].length) + r[3]); }
+      else bags.push(p[3] + part);
+      bags.forEach(function (bag) {
+        var key = bag + '|' + Math.floor(t.getTime() / 60000);
+        if (have[key]) return; have[key] = 1;
+        out.push([bag, t, p[1], '', type, now]);
+      });
+    });
+  });
   return out;
 }
 
