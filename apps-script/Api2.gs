@@ -204,9 +204,10 @@ function desk2Safe_(me) {
   });
   var bySid = {}, depositBags = {}, cover = Infinity;
   readTab_(TABS.BR).forEach(function (b) {
-    if (!b[0] || String(b[6]).toUpperCase() === 'VOIDED') return;
+    if (!b[0]) return;
     var t = b[2] instanceof Date ? b[2].getTime() : new Date(b[2]).getTime();
     cover = Math.min(cover, t); depositBags[String(b[0])] = 1;
+    if (String(b[6]).toUpperCase() === 'VOIDED') return;
     (bySid[String(b[3]).trim()] = bySid[String(b[3]).trim()] || []).push({ bag: String(b[0]), t: t, amt: Number(b[7]) || 0, by: String(b[5]), wz: String(b[13] || '') });
   });
   var rq = readTab_(TABS.RQ), rqFirst = rq.reduce(function (m, r) { var d = normDate_(r[0]); return !m || d < m ? d : m; }, '');
@@ -214,10 +215,12 @@ function desk2Safe_(me) {
     var o = safes[id], ev = Object.keys(events[id] || {}).map(Number).sort(function (a, b) { return b - a; });
     var last = ev.length ? ev[0] : null, bags = bySid[id] || [];
     var inSafe = bags.filter(function (b) { return !picked[b.bag]; }).sort(function (a, b) { return a.t - b.t; });
-    var missed = last ? inSafe.filter(function (b) { return b.t < last - 2 * 3600e3; }) : [];
+    var shared = o.stores.length > 1;   // two safes on one Brinks ID: one store's pickup doesn't collect the other's bags
+    var missed = last && !shared ? inSafe.filter(function (b) { return b.t < last - 2 * 3600e3; }) : [];
     var noRecord = [];
-    ev.forEach(function (t) {
-      if (t < cover + 2 * 864e5) return;
+    ev.forEach(function (t, k) {
+      var prev = ev[k + 1];                 // ev is newest first
+      if (!prev || prev < cover) return;    // only pickups whose whole window is inside the deposit history
       Object.keys(picked).forEach(function (bag) { if (picked[bag] === t && !depositBags[bag] && bags.length) noRecord.push({ bag: bag, t: t }); });
     });
     var drops = round2_(inSafe.reduce(function (s, b) { return s + b.amt; }, 0)), rqSince = null;
@@ -228,7 +231,7 @@ function desk2Safe_(me) {
         rqSince = round2_(rq.reduce(function (s, r) { return ws.indexOf(String(r[1])) >= 0 && normDate_(r[0]) >= lastDay ? s + (Number(r[6]) || 0) : s; }, 0));
       }
     }
-    return { id: id, stores: o.stores, limit: o.limit || limitAll, last: last, daysSince: last ? Math.floor((now - last) / 864e5) : null,
+    return { id: id, shared: shared, stores: o.stores, limit: o.limit || limitAll, last: last, daysSince: last ? Math.floor((now - last) / 864e5) : null,
       history: ev.slice(0, 8).map(function (t) { return { at: t, bags: events[id][t] }; }),
       drops: drops, bags: inSafe.length, oldest: inSafe.length ? inSafe[0].t : null, rqSince: rqSince,
       inSafe: inSafe.slice(-60).map(function (b) { return [b.bag, b.t, b.amt, b.by]; }),

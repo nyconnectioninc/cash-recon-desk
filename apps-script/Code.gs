@@ -218,7 +218,10 @@ function ingestBrinks(query) {
           upsertBrinks_(parsed);
           count += parsed.length;
         });
-      } catch (e) { logRun('Brinks email ' + reportDate + ' skipped: ' + e.message); return; }
+      } catch (e) {
+        if (/Deposit Barcode/.test(e.message)) { props.setProperty('br_' + msg.getId(), 'not-a-bag-report'); return; }   // other Brinks report (no barcodes)
+        logRun('Brinks email ' + reportDate + ' skipped: ' + e.message); return;
+      }
       props.setProperty('br_' + msg.getId(), reportDate);
       addBrinksReportDate_(reportDate);
       t.addLabel(label);
