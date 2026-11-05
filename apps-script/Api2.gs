@@ -25,10 +25,10 @@ function desk2Tab_(name, headers) {
 }
 function desk2Setup() {
   desk2Tab_(DESK2.ALLOC, DESK2.ALLOC_H); desk2Tab_(DESK2.LOCKS, DESK2.LOCK_H); desk2Tab_(DESK2.REQ, DESK2.REQ_H);
-  desk2MapCol_('Pickup Days'); desk2MapCol_('Safe Limit');
+  desk2Tab_(DESK2.PICK, DESK2.PICK_H); desk2MapCol_('Safe Limit');
   var cfg = sheet_(TABS.CFG, ['Key', 'Value', 'What it does']), have = cfg.getDataRange().getValues().map(function (r) { return r[0]; });
   if (have.indexOf('SAFE_LIMIT') < 0) cfg.appendRow(['SAFE_LIMIT', '5000', 'Safe Tracker warning level ($), unless the store has its own Safe Limit on the Store Map']);
-  if (have.indexOf('PICKUP_HOUR') < 0) cfg.appendRow(['PICKUP_HOUR', '12', 'Bags dropped after this hour on a pickup day stay in the safe until the next pickup']);
+  if (have.indexOf('PICKUP_QUERY') < 0) cfg.appendRow(['PICKUP_QUERY', 'from:no-reply@brinksinc.com subject:"Pick up and Delivery" has:attachment newer_than:30d', 'Gmail search for the Brinks Pick up and Delivery report']);
   return 'Desk features ready';
 }
 function desk2MapCol_(name) {
@@ -90,49 +90,125 @@ function desk2Range_(me, from, to) {
     rows: rows, allocs: allocs.filter(function (a) { return sc.allowed[a.wz] && a.date >= addDays_(from, -14) && a.date <= to; }), locks: desk2Locks_() };
 }
 
-/* ---------- Safe Tracker ---------- */
-function desk2Safe_(me) {
-  var sc = deskScope_(me), cfg = getCfg_(), limitAll = Number(cfg.SAFE_LIMIT) || 5000, pickHour = Number(cfg.PICKUP_HOUR) || 12;
-  var tz = Session.getScriptTimeZone(), today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-  var mapRows = ss_().getSheetByName(TABS.MAP).getDataRange().getValues(), h = mapRows[0].map(String);
-  var iW = h.indexOf('WZ Store ID'), iP = h.indexOf('Pickup Days'), iL = h.indexOf('Safe Limit');
-  var meta = {};
-  mapRows.slice(1).forEach(function (r) { var w = String(r[iW]).trim(); if (w) meta[w] = { days: iP >= 0 ? String(r[iP] || '') : '', limit: iL >= 0 ? Number(r[iL]) || 0 : 0 }; });
-  var DOW = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 };
-  var bags = readTab_(TABS.BR).filter(function (b) { return b[0] && String(b[6]).toUpperCase() !== 'VOIDED'; });
-  var rq = readTab_(TABS.RQ);
-  var out = Object.keys(sc.allowed).filter(function (w) { return sc.map.byWZ[w] && sc.map.byWZ[w].active; }).map(function (w) {
-    var s = sc.map.byWZ[w], m = meta[w] || { days: '', limit: 0 };
-    var dows = m.days.toUpperCase().split(/[^A-Z]+/).map(function (x) { return DOW[x.slice(0, 3)]; }).filter(function (x) { return x !== undefined; });
-    var row = { wz: w, name: String(s.name), dm: s.dm, pickupDays: m.days, limit: m.limit || limitAll, last: null, drops: 0, rq: 0, bags: 0 };
-    if (!dows.length) return row;
-    var d = today;
-    for (var k = 0; k < 8; k++) { if (dows.indexOf(new Date(d + 'T12:00:00').getDay()) >= 0) break; d = addDays_(d, -1); }
-    row.last = d;
-    var cut = new Date(d + 'T00:00:00'); cut.setHours(pickHour);
-    bags.forEach(function (b) {
-      var t = b[2] instanceof Date ? b[2] : new Date(b[2]);
-      var sid = String(b[3]).trim(), owner = String(b[13] || '') || (/^WZ\d/i.test(sid) ? sid.toUpperCase() : ((sc.map.byBrinksId[sid] || [])[0] || ''));
-      if (owner === w && t >= cut) { row.drops += Number(b[7]) || 0; row.bags++; }
+/* ---------- Safe Tracker (bag level: Deposit Report barcodes vs Pick up & Delivery barcodes) ---------- */
+DESK2.PICK = 'Brinks_Pickups';
+DESK2.PICK_H = ['Bag', 'Picked At', 'Store ID', 'Location', 'Type', 'Ingested'];
+
+/** Weekly "Pick up and Delivery" email (and any xlsx dropped in Drive › Brinks Recon › Brinks Pickups) → Brinks_Pickups. */
+function ingestPickups() {
+  var cfg = getCfg_(), props = PropertiesService.getScriptProperties();
+  var q = cfg.PICKUP_QUERY || 'from:no-reply@brinksinc.com subject:"Pick up and Delivery" has:attachment newer_than:30d';
+  var sh = desk2Tab_(DESK2.PICK, DESK2.PICK_H), have = {}, added = 0;
+  sh.getDataRange().getValues().slice(1).forEach(function (r) { have[r[0] + '|' + (r[1] instanceof Date ? r[1].getTime() : r[1])] = 1; });
+  var take = function (blob, name) {
+    var add = desk2ParsePickups_(xlsxToValues_(blob, name), have);
+    if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, add[0].length).setValues(add);
+    added += add.length;
+  };
+  GmailApp.search(q).forEach(function (t) {
+    t.getMessages().forEach(function (msg) {
+      if (props.getProperty('pk_' + msg.getId())) return;
+      msg.getAttachments().forEach(function (att) { if (/\.xlsx?$/i.test(att.getName())) take(att.copyBlob(), att.getName()); });
+      props.setProperty('pk_' + msg.getId(), '1');
     });
-    rq.forEach(function (r) { if (String(r[1]) === w && normDate_(r[0]) >= d) row.rq += Number(r[6]) || 0; });
-    row.drops = round2_(row.drops); row.rq = round2_(row.rq);
-    return row;
   });
-  return { ok: true, today: today, limit: limitAll, pickupHour: pickHour, stores: out };
+  var it = folderByPath_('Brinks Recon/Brinks Pickups', true).getFiles();
+  while (it.hasNext()) {
+    var f = it.next(), key = 'pkf_' + f.getId() + '_' + f.getLastUpdated().getTime();
+    if (!/\.xlsx?$/i.test(f.getName()) || props.getProperty(key)) continue;
+    take(f.getBlob(), f.getName()); props.setProperty(key, '1');
+  }
+  if (added) logRun('Pickups ingested: ' + added + ' bag rows');
+  return added;
+}
+function desk2ParsePickups_(rows, have) {
+  var hr = -1;
+  for (var r = 0; r < Math.min(rows.length, 20); r++) if (rows[r].map(String).indexOf('Bag/Order Number') >= 0) { hr = r; break; }
+  if (hr < 0) throw new Error('Pickup report header not found');
+  var h = rows[hr].map(function (x) { return String(x).trim(); }), c = function (n) { return h.indexOf(n); };
+  var iD = c('Date'), iS = c('Store ID'), iL = c('Location Name'), iB = c('Bag/Order Number'), iT = c('Transaction Type'), now = new Date(), out = [];
+  for (var k = hr + 1; k < rows.length; k++) {
+    var x = rows[k], bag = String(x[iB] || '').trim();
+    if (!bag || !(x[iD] instanceof Date)) continue;
+    var key = bag + '|' + x[iD].getTime();
+    if (have[key]) continue;
+    have[key] = 1;
+    out.push([bag, x[iD], String(x[iS]).trim(), String(x[iL] || ''), String(x[iT] || ''), now]);
+  }
+  return out;
+}
+
+/** One-time: pull every Deposit Report back to a date so pickups have dollar amounts behind them. Safe to re-run. */
+function brinksBackfill() {
+  ingestBrinks('from:no-reply@brinksinc.com subject:"Deposit Report" has:attachment after:2026/08/25');
+}
+
+function desk2Safe_(me) {
+  var sc = deskScope_(me), cfg = getCfg_(), limitAll = Number(cfg.SAFE_LIMIT) || 5000, now = Date.now();
+  var mapRows = ss_().getSheetByName(TABS.MAP).getDataRange().getValues(), h = mapRows[0].map(String);
+  var iW = h.indexOf('WZ Store ID'), iL = h.indexOf('Safe Limit'), lim = {};
+  mapRows.slice(1).forEach(function (r) { var w = String(r[iW]).trim(); if (w && iL >= 0) lim[w] = Number(r[iL]) || 0; });
+  // one safe per Brinks Store ID (stores sharing an ID are shown together)
+  var safes = {};
+  Object.keys(sc.allowed).forEach(function (w) {
+    var s = sc.map.byWZ[w]; if (!s || !s.active) return;
+    var id = s.brinksId || w, o = safes[id] = safes[id] || { id: id, stores: [], limit: 0 };
+    o.stores.push({ wz: w, name: String(s.name), dm: s.dm });
+    if (lim[w]) o.limit = Math.max(o.limit, lim[w]);
+  });
+  var picked = {}, events = {};
+  readTab_(DESK2.PICK).forEach(function (r) {
+    if (!r[0] || !/pickup/i.test(String(r[4]))) return;
+    var t = r[1] instanceof Date ? r[1].getTime() : new Date(r[1]).getTime(), sid = String(r[2]).trim();
+    picked[String(r[0])] = t;
+    var e = (events[sid] = events[sid] || {}); e[t] = (e[t] || 0) + 1;
+  });
+  var bySid = {}, depositBags = {}, cover = Infinity;
+  readTab_(TABS.BR).forEach(function (b) {
+    if (!b[0] || String(b[6]).toUpperCase() === 'VOIDED') return;
+    var t = b[2] instanceof Date ? b[2].getTime() : new Date(b[2]).getTime();
+    cover = Math.min(cover, t); depositBags[String(b[0])] = 1;
+    (bySid[String(b[3]).trim()] = bySid[String(b[3]).trim()] || []).push({ bag: String(b[0]), t: t, amt: Number(b[7]) || 0, by: String(b[5]), wz: String(b[13] || '') });
+  });
+  var rq = readTab_(TABS.RQ), rqFirst = rq.reduce(function (m, r) { var d = normDate_(r[0]); return !m || d < m ? d : m; }, '');
+  var out = Object.keys(safes).map(function (id) {
+    var o = safes[id], ev = Object.keys(events[id] || {}).map(Number).sort(function (a, b) { return b - a; });
+    var last = ev.length ? ev[0] : null, bags = bySid[id] || [];
+    var inSafe = bags.filter(function (b) { return !picked[b.bag]; }).sort(function (a, b) { return a.t - b.t; });
+    var missed = last ? inSafe.filter(function (b) { return b.t < last - 2 * 3600e3; }) : [];
+    var noRecord = [];
+    ev.forEach(function (t) {
+      if (t < cover + 2 * 864e5) return;
+      Object.keys(picked).forEach(function (bag) { if (picked[bag] === t && !depositBags[bag] && bags.length) noRecord.push({ bag: bag, t: t }); });
+    });
+    var drops = round2_(inSafe.reduce(function (s, b) { return s + b.amt; }, 0)), rqSince = null;
+    if (last) {
+      var lastDay = Utilities.formatDate(new Date(last), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      if (rqFirst && lastDay >= rqFirst) {
+        var ws = o.stores.map(function (s) { return s.wz; });
+        rqSince = round2_(rq.reduce(function (s, r) { return ws.indexOf(String(r[1])) >= 0 && normDate_(r[0]) >= lastDay ? s + (Number(r[6]) || 0) : s; }, 0));
+      }
+    }
+    return { id: id, stores: o.stores, limit: o.limit || limitAll, last: last, daysSince: last ? Math.floor((now - last) / 864e5) : null,
+      history: ev.slice(0, 8).map(function (t) { return { at: t, bags: events[id][t] }; }),
+      drops: drops, bags: inSafe.length, oldest: inSafe.length ? inSafe[0].t : null, rqSince: rqSince,
+      inSafe: inSafe.slice(-60).map(function (b) { return [b.bag, b.t, b.amt, b.by]; }),
+      missed: missed.map(function (b) { return [b.bag, b.t, b.amt, b.by]; }), noRecord: noRecord.slice(0, 30).map(function (x) { return [x.bag, x.t]; }) };
+  });
+  return { ok: true, limit: limitAll, coverage: isFinite(cover) ? cover : null, rqFirst: rqFirst, safes: out,
+    lastReport: (function () { var r = readTab_(DESK2.PICK); return r.length ? r[r.length - 1][5] instanceof Date ? r[r.length - 1][5].getTime() : null : null; })() };
 }
 
 function desk2SaveStore_(me, b) {
   if (!me.isAdmin) return { ok: false, error: 'admin_only' };
-  var sh = ss_().getSheetByName(TABS.MAP), cP = desk2MapCol_('Pickup Days'), cL = desk2MapCol_('Safe Limit');
-  var v = sh.getDataRange().getValues(), iW = v[0].map(String).indexOf('WZ Store ID');
-  for (var i = 1; i < v.length; i++) if (String(v[i][iW]).trim() === String(b.wz)) {
-    sh.getRange(i + 1, cP).setValue(String(b.pickupDays || '').slice(0, 60));
-    sh.getRange(i + 1, cL).setValue(b.safeLimit === '' || b.safeLimit == null ? '' : Number(b.safeLimit) || '');
-    deskLog_(me, '', b.wz, String(v[i][0]), 'Store settings', 'Pickup ' + (b.pickupDays || '—') + ' · limit ' + (b.safeLimit || 'default'));
-    return desk2Safe_(me);
+  var sh = ss_().getSheetByName(TABS.MAP), cL = desk2MapCol_('Safe Limit');
+  var v = sh.getDataRange().getValues(), h = v[0].map(String), iW = h.indexOf('WZ Store ID'), iB = h.indexOf('Brinks Store ID'), n = 0;
+  for (var i = 1; i < v.length; i++) if (String(v[i][iB]).trim() === String(b.id) || String(v[i][iW]).trim() === String(b.id)) {
+    sh.getRange(i + 1, cL).setValue(b.safeLimit === '' || b.safeLimit == null ? '' : Number(b.safeLimit) || ''); n++;
   }
-  return { ok: false, error: 'not_found' };
+  if (!n) return { ok: false, error: 'not_found' };
+  deskLog_(me, '', String(b.id), '', 'Safe limit', b.safeLimit || 'default');
+  return desk2Safe_(me);
 }
 
 /* ---------- Combined deposit / extra-$ matcher ---------- */
@@ -323,4 +399,16 @@ function desk2ExportSheet_(me, b) {
   try { f.addViewer(me.email); } catch (e) {}
   deskLog_(me, data.from + '→' + data.to, b.wz || '', '', 'Export Google Sheet', secs.join(','));
   return { ok: true, url: ss.getUrl() };
+}
+
+/** Editor-only read check of the new endpoints. */
+function desk2SelfTest() {
+  var admin = { email: 'test', name: 'Test', role: 'Admin', scope: '', canEdit: true, isAdmin: true };
+  var r = desk2Range_(admin, '2026-11-01', '2026-11-04');
+  console.log('range rows=' + r.rows.length + ' allocs=' + r.allocs.length);
+  var s = desk2Safe_(admin);
+  console.log('safes=' + s.safes.length + ' withPickup=' + s.safes.filter(function (x) { return x.last; }).length + ' coverage=' + new Date(s.coverage) + ' rqFirst=' + s.rqFirst);
+  s.safes.slice().sort(function (a, b) { return b.drops - a.drops; }).slice(0, 12).forEach(function (x) {
+    console.log(x.id + ' last=' + (x.last ? new Date(x.last).toISOString().slice(0, 16) : '—') + ' bags=' + x.bags + ' $' + x.drops + ' missed=' + x.missed.length + ' noRecord=' + x.noRecord.length + ' rqSince=' + x.rqSince);
+  });
 }

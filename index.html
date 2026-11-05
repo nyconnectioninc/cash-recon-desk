@@ -198,6 +198,9 @@ h3{font-size:15px;margin:0;font-weight:650}
 /* v2 */
 .tiles.t4{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:860px){.tiles.t4{grid-template-columns:repeat(2,minmax(0,1fr))}.tiles.t4 .tile:first-child{grid-column:auto}}
+.mtheme{display:none}
+.theme-seg button{padding:4px 10px;font-size:12px}
+@media (max-width:860px){.mtheme{display:flex;justify-content:flex-end;margin-top:-8px}}
 .p-combo{background:color-mix(in srgb,var(--indigo) 16%,transparent);color:var(--indigo)}
 .lockbar{display:flex;gap:12px;align-items:center;justify-content:space-between;background:var(--surface);border-radius:var(--r-lg);padding:10px 14px;font-size:14px;color:var(--muted);flex-wrap:wrap}
 .lockbar.on{background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--fg)}
@@ -206,7 +209,7 @@ h3{font-size:15px;margin:0;font-weight:650}
 .days label{flex-direction:row!important;align-items:center;gap:8px!important;color:var(--fg)!important;font-weight:500!important;font-size:14px!important}
 .days.dow{flex-direction:row;flex-wrap:wrap;gap:12px}
 .chip{background:var(--fill);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:500}
-.th.safe-g,.tr.safe-g{grid-template-columns:minmax(0,1.4fr) 110px 90px 100px 100px 100px minmax(120px,1fr)}
+.th.safe-g,.tr.safe-g{grid-template-columns:minmax(0,1.5fr) 150px 50px 100px 80px minmax(110px,.8fr) minmax(120px,1fr)}
 .meter{display:flex;flex-direction:column;gap:3px}
 .meter i{display:block;height:6px;border-radius:3px;max-width:100%}
 .meter{background:none}
@@ -233,8 +236,12 @@ h3{font-size:15px;margin:0;font-weight:650}
 @media (max-width:860px){
   .th.safe-g{display:none}
   .tr.safe-g{grid-template-columns:minmax(0,1fr) auto}
-  .tr.safe-g>span:nth-child(2),.tr.safe-g>span:nth-child(3),.tr.safe-g>span:nth-child(5),.tr.safe-g>span:nth-child(6){display:none}
-  .tr.safe-g .meter{grid-column:1/-1}
+  .tr.safe-g>span:nth-child(3),.tr.safe-g>span:nth-child(5){display:none}
+  .tr.safe-g>span:nth-child(1){grid-column:1;grid-row:1}
+  .tr.safe-g>span:nth-child(4){grid-column:2;grid-row:1}
+  .tr.safe-g>span:nth-child(2){grid-column:1;grid-row:2;display:block}
+  .tr.safe-g>span:nth-child(6){grid-column:2;grid-row:2;justify-content:flex-end!important}
+  .tr.safe-g>span:nth-child(7){grid-column:1/-1;grid-row:3}
   .tr.score-g{grid-template-columns:minmax(0,1fr) 40px}
   .tr.score-g .sbar,.tr.score-g .dm{grid-column:1/-1}
   .tr.score-g .dm{display:block}
@@ -253,6 +260,13 @@ h3{font-size:15px;margin:0;font-weight:650}
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbxam-F_3keAk2SmdAxlfKPFAqY-6LLxfGVT_yR3nqXU0IpoSP5UsMVOhexhN2cwZq8Tcg/exec";
 const TOKEN_KEY = "crd.session";
+const THEME_KEY = "crd.theme";
+function getTheme(){ try{ return localStorage.getItem(THEME_KEY)||"light"; }catch(e){ return "light"; } }
+function applyTheme(t){ if(t==="auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme",t); }
+function setTheme(t){ try{ localStorage.setItem(THEME_KEY,t); }catch(e){} applyTheme(t); document.querySelectorAll("[data-theme-set]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.themeSet===t)); }
+function themeSeg(){ const t=getTheme(); return `<div class="seg theme-seg" role="group" aria-label="Appearance">${[["light","Light"],["dark","Dark"],["auto","Auto"]].map(([k,l])=>`<button type="button" data-theme-set="${k}" aria-pressed="${t===k}">${l}</button>`).join("")}</div>`; }
+document.addEventListener("click",e=>{ const b=e.target.closest&&e.target.closest("[data-theme-set]"); if(b) setTheme(b.dataset.themeSet); });
+applyTheme(getTheme());
 
 const STATUS = {
   "MISSING DEPOSIT":{cls:"p-missing",label:"Missing deposit",color:"var(--red)",open:1},
@@ -327,7 +341,7 @@ function renderLogin(email,msg){
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" id="l-back">Use a different email</button>`
     :`<div class="field"><label for="l-email">Work email</label><input id="l-email" type="email" autocomplete="email" required placeholder="name@wireless-zone.com"></div>
       <button class="btn primary" type="submit">Email me a code</button><button class="btn" type="button" id="l-req">Request access</button>`}
-    <p class="err" id="l-err" role="alert">${esc(msg||"")}</p></form></div>`;
+    <p class="err" id="l-err" role="alert">${esc(msg||"")}</p><div style="display:flex;justify-content:center">${themeSeg()}</div></form></div>`;
   setTimeout(()=>{ const i=$(email?"l-code":"l-email"); i&&i.focus(); },30);
   const back=$("l-back"); if(back) back.onclick=()=>renderLogin(null);
   const rq=$("l-req"); if(rq) rq.onclick=()=>renderRequest();
@@ -381,12 +395,13 @@ function renderSide(){
   ${b&&b.days.length?`<div><div class="nav-h">RECENT DAYS</div><nav class="nav">${b.days.slice(0,10).map(d=>`<button data-day="${d.date}" ${S.view==="day"&&S.date===d.date?'aria-current="page"':""}><span class="lbl">${dayLabel(d.date)}</span><span class="cnt ${d.open?"bad":""}">${d.open?d.open+" open":"✓"}</span></button>`).join("")}</nav></div>`:""}
   <div class="side-foot"><div><b style="color:var(--fg)">${esc(S.me&&S.me.name||"")}</b><br>${esc(S.me&&S.me.role||"")}</div>
   ${b&&b.lastRun&&b.lastRun.at?`<div>Last engine run ${new Date(b.lastRun.at).toLocaleString("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"})}</div>`:""}
+  ${themeSeg()}
   <button class="btn" id="so" style="align-self:flex-start">Sign out</button></div>`;
   $("side").querySelectorAll("[data-view]").forEach(x=>x.onclick=()=>go(x.dataset.view));
   $("side").querySelectorAll("[data-day]").forEach(x=>x.onclick=()=>{ S.view="day"; loadDay(x.dataset.day); });
   $("so").onclick=()=>signOut();
 }
-function mbar(){ return `<div class="mbar">${navItems().map(([k,l,,,n])=>`<button data-mview="${k}" ${S.view===k?'aria-current="page"':""}>${l}${n&&k==="open"?` · ${n}`:""}</button>`).join("")}<button data-mview="signout">Sign out</button></div>`; }
+function mbar(){ return `<div class="mbar">${navItems().map(([k,l,,,n])=>`<button data-mview="${k}" ${S.view===k?'aria-current="page"':""}>${l}${n&&k==="open"?` · ${n}`:""}</button>`).join("")}<button data-mview="signout">Sign out</button></div><div class="mtheme">${themeSeg()}</div>`; }
 function go(v){ S.view=v; render(); window.scrollTo(0,0);
   if(v==="team"){ if(!S.users) loadUsers(); loadReqs(); }
   if(v==="safe") loadSafe(); if(v==="score"&&!S.scoreData) loadScore(); if(v==="cal"&&!S.calData) loadCal(); }
@@ -684,40 +699,49 @@ async function afterEdit(r,msg){
 async function loadSafe(force){ if(S.safe&&!force) return; const r=await api("safe"); if(r.ok){ S.safe=r; render(); } else toast(errText(r)); }
 function viewSafe(){
   const s=S.safe; if(!s) return `<div class="top"><div><div class="eyebrow">SAFES</div><h1>Safe tracker</h1></div></div><div class="tbl"><div class="empty"><b>Loading…</b></div></div>`;
-  const set=s.stores.filter(x=>x.last), unset=s.stores.filter(x=>!x.last);
-  const over=set.filter(x=>x.drops>x.limit), near=set.filter(x=>x.drops<=x.limit&&x.drops>x.limit*.8), total=set.reduce((t,x)=>t+x.drops,0);
-  const rows=set.slice().sort((a,b)=>b.drops/b.limit-a.drops/a.limit);
+  const nm=x=>x.stores.map(t=>t.name).join(" + "), ago=t=>{ const d=Math.floor((Date.now()-t)/864e5); return d<=0?"today":d===1?"1 day ago":d+" days ago"; };
+  const q=S.q.toLowerCase(), list=s.safes.filter(x=>!q||`${nm(x)} ${x.id} ${x.stores.map(t=>t.wz+" "+t.dm).join(" ")}`.toLowerCase().includes(q));
+  const over=s.safes.filter(x=>x.drops>x.limit), flag=s.safes.filter(x=>x.missed.length||x.noRecord.length), total=s.safes.reduce((t,x)=>t+x.drops,0), stale=s.safes.filter(x=>!x.last||x.daysSince>14);
+  const rows=list.slice().sort((a,b)=>(b.missed.length+b.noRecord.length>0)-(a.missed.length+a.noRecord.length>0)||b.drops/b.limit-a.drops/a.limit);
   const tile=(lab,n,meta,c)=>`<div class="tile"><span class="lab"><span class="sw" style="background:${c}"></span>${lab}</span><span class="big num">${n}</span><span class="meta">${meta}</span></div>`;
-  return `<div class="top"><div><div class="eyebrow">SAFES</div><h1>Safe tracker</h1><p class="sub">Cash that should be sitting in each safe since its last Brinks pickup. Bags dropped after ${s.pickupHour>12?s.pickupHour-12+" PM":s.pickupHour+(s.pickupHour===12?" PM":" AM")} on a pickup day count toward the next pickup.</p></div></div>
+  return `<div class="top"><div><div class="eyebrow">SAFES</div><h1>Safe tracker</h1><p class="sub">Every bag on the Brinks deposit report is checked against the Pick up &amp; Delivery report by barcode. "In safe" means dropped but not picked up yet.</p></div></div>
   <div class="tiles t4">
-    ${tile("Over limit",over.length,`limit ${money(s.limit)} unless set per store`,"var(--red)")}
-    ${tile("Near limit",near.length,"over 80% of limit","var(--orange)")}
-    ${tile("In safes now",money(total).replace(".00",""),`${set.length} stores tracked`,"var(--accent)")}
-    ${tile("No pickup days",unset.length,S.me.isAdmin?"tap a store to set them":"ask an admin to set them","var(--faint)")}
+    ${tile("In safes now",money(total).replace(/\.\d\d$/,""),`${s.safes.reduce((t,x)=>t+x.bags,0)} bags across ${s.safes.length} safes`,"var(--accent)")}
+    ${tile("Over limit",over.length,`limit ${money(s.limit).replace(".00","")} unless set per safe`,"var(--red)")}
+    ${tile("Bag issues",flag.length,"missed by a pickup, or picked up with no deposit record","var(--orange)")}
+    ${tile("No pickup in 14+ days",stale.length,s.lastReport?`pickup report loaded ${ago(s.lastReport)}`:"no pickup report loaded yet","var(--faint)")}
   </div>
-  <div class="tbl"><div class="th safe-g"><span>Store</span><span>Pickup days</span><span>Last pickup</span><span class="r">In safe</span><span class="r">RQ since</span><span class="r">Not dropped</span><span>vs. limit</span></div>
-  ${rows.map(x=>{ const p=Math.min(100,x.drops/x.limit*100), c=x.drops>x.limit?"var(--red)":p>80?"var(--orange)":"var(--green)", gap=Math.round((x.rq-x.drops)*100)/100;
-    return `<button class="tr safe-g" data-safe="${x.wz}"><span class="st"><b>${esc(x.name)}</b><small>${esc(x.wz)} · ${esc(x.dm)}</small></span><span class="dm">${esc(x.pickupDays)}</span>
-      <span class="dm">${dayLabel(x.last)}</span><span class="r num"><b>${money(x.drops)}</b><small class="muted" style="display:block;font-size:12px">${x.bags} bag${x.bags===1?"":"s"}</small></span>
-      <span class="r num">${money(x.rq)}</span><span class="r num ${gap>S.boot.tolerance?"neg":""}">${Math.abs(gap)<.005?"—":money(gap)}</span>
-      <span class="meter"><i style="width:${p}%;background:${c}"></i><small>${Math.round(x.drops/x.limit*100)}% of ${money(x.limit).replace(".00","")}</small></span></button>`; }).join("")||`<div class="empty"><b>No pickup schedules yet</b>Set each store's Brinks pickup days to start tracking.</div>`}
+  <div class="toolbar"><label class="search">${IC.search}<input id="q" placeholder="Store, Brinks ID, DM" value="${esc(S.q)}" aria-label="Search safes"></label></div>
+  <div class="tbl"><div class="th safe-g"><span>Safe</span><span>Last pickup</span><span class="r">Bags</span><span class="r">In safe</span><span>Oldest bag</span><span>Issues</span><span>vs. limit</span></div>
+  ${rows.map(x=>{ const p=Math.min(100,x.drops/x.limit*100), c=x.drops>x.limit?"var(--red)":p>80?"var(--orange)":"var(--green)";
+    return `<button class="tr safe-g" data-safe="${esc(x.id)}"><span class="st"><b>${esc(nm(x))}</b><small>Brinks ID ${esc(x.id)} · ${esc(x.stores.map(t=>t.wz).join(", "))}${x.stores.length>1?" · shared ID":""}</small></span>
+      <span class="dm">${x.last?`${new Date(x.last).toLocaleDateString("en-US",{month:"numeric",day:"numeric"})} <span class="muted">· ${ago(x.last)}</span>`:"none on file"}</span>
+      <span class="r num">${x.bags}</span><span class="r num"><b>${money(x.drops)}</b></span>
+      <span class="dm">${x.oldest?new Date(x.oldest).toLocaleDateString("en-US",{month:"numeric",day:"numeric"}):"—"}</span>
+      <span class="cell-st" style="justify-content:flex-start">${x.missed.length?`<span class="pill p-short">${x.missed.length} missed</span>`:""}${x.noRecord.length?`<span class="pill p-missing">${x.noRecord.length} no record</span>`:""}${!x.missed.length&&!x.noRecord.length?'<span class="muted" style="font-size:13px">—</span>':""}</span>
+      <span class="meter"><i style="width:${p}%;background:${c}"></i><small>${Math.round(x.drops/x.limit*100)}% of ${money(x.limit).replace(".00","")}</small></span></button>`; }).join("")||`<div class="empty"><b>No safes match</b></div>`}
   </div>
-  ${unset.length?`<div><div class="group-h"><h2>Needs pickup days</h2><span>${unset.length}</span></div><div class="card" style="display:flex;flex-wrap:wrap;gap:6px">${unset.map(x=>`<button class="chip" data-safe="${x.wz}">${esc(x.name)}</button>`).join("")}</div></div>`:""}`;
+  <p class="fine muted" style="margin:0 4px">Deposit history starts ${s.coverage?new Date(s.coverage).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—"}. The pickup report is read every morning from the Brinks email; drop a manual export in Drive › Brinks Recon › Brinks Pickups to load it sooner.</p>`;
 }
-function safeSheet(wz){
-  const x=S.safe.stores.find(s=>s.wz===wz); if(!x) return;
-  const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], cur=String(x.pickupDays||"").toLowerCase();
-  openSheet(`<div class="sh-head"><div><div class="eyebrow">${esc(wz)}</div><h2 id="sh-t">${esc(x.name)}</h2></div><button class="iconbtn" data-close aria-label="Close">${IC.x}</button></div>
-  <div class="sh-body"><div class="kv">
-    <div class="kv-row"><span class="kv-k">Last pickup</span><span class="kv-v">${x.last?dayLabel(x.last,true):"Not set"}</span></div>
-    <div class="kv-row"><span class="kv-k">In safe</span><span class="kv-v num"><b>${money(x.drops)}</b> · ${x.bags} bags</span></div>
-    <div class="kv-row"><span class="kv-k">RQ since</span><span class="kv-v num">${money(x.rq)}</span></div>
-    <div class="kv-row"><span class="kv-k">Limit</span><span class="kv-v num">${money(x.limit)}</span></div></div>
-  ${S.me.isAdmin?`<form class="form" id="sf"><h3>Brinks pickup schedule</h3><div class="days dow">${DOW.map(d=>`<label><input type="checkbox" value="${d}" ${cur.includes(d.toLowerCase())?"checked":""}> ${d}</label>`).join("")}</div>
-    <label>Safe limit for this store (blank = default ${money(S.safe.limit)})<input id="s-l" inputmode="numeric" value="${x.limit!==S.safe.limit?x.limit:""}"></label>
-    <p class="err" id="s-err"></p><button class="btn primary" type="submit">Save</button></form>`:`<p class="fine">Ask an admin to change pickup days or the limit.</p>`}</div>`);
-  const f=$("sf"); if(f) f.onsubmit=async ev=>{ ev.preventDefault(); const days=[...f.querySelectorAll("input:checked")].map(i=>i.value).join(", ");
-    const r=await api("saveStore",{wz,pickupDays:days,safeLimit:$("s-l").value.replace(/[$,]/g,"")}); if(!r.ok){ $("s-err").textContent=errText(r); return; }
+function safeSheet(id){
+  const x=S.safe.safes.find(s=>s.id===id); if(!x) return;
+  const dt=t=>new Date(t).toLocaleString("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"});
+  const bagRows=(arr,empty)=>arr.length?arr.slice().reverse().map(b=>`<div class="mini-r"><span>${esc(b[3]||"")} · ${dt(b[1])}</span><b class="num">${money(b[2])}</b><small>${esc(b[0])}</small></div>`).join(""):`<div class="mini-r"><span class="muted">${empty}</span></div>`;
+  openSheet(`<div class="sh-head"><div><div class="eyebrow">BRINKS ID ${esc(id)}</div><h2 id="sh-t">${esc(x.stores.map(t=>t.name).join(" + "))}</h2></div><button class="iconbtn" data-close aria-label="Close">${IC.x}</button></div>
+  <div class="sh-body"><div class="muted" style="font-size:13px">${x.stores.map(t=>`${esc(t.wz)} · DM ${esc(t.dm)}`).join("<br>")}</div>
+  <div class="kv">
+    <div class="kv-row"><span class="kv-k">Last pickup</span><span class="kv-v">${x.last?dt(x.last):"None in the pickup report"}</span></div>
+    <div class="kv-row"><span class="kv-k">In safe now</span><span class="kv-v num"><b>${money(x.drops)}</b> · ${x.bags} bag${x.bags===1?"":"s"}</span></div>
+    ${x.rqSince!=null?`<div class="kv-row"><span class="kv-k">RQ since pickup</span><span class="kv-v num">${money(x.rqSince)} <span class="muted">· ${money(x.rqSince-x.drops)} not in the safe yet</span></span></div>`:""}
+    <div class="kv-row"><span class="kv-k">Limit</span><span class="kv-v num">${money(x.limit)} · ${Math.round(x.drops/x.limit*100)}% full</span></div></div>
+  ${x.missed.length?`<div><div class="group-h"><h3 style="color:var(--orange)">Missed by the last pickup</h3><span>${x.missed.length}</span></div><p class="fine" style="margin:0 4px 6px">Dropped before the last pickup but not on Brinks' pickup list. Confirm the bag is still in the safe.</p><div class="mini">${bagRows(x.missed,"")}</div></div>`:""}
+  ${x.noRecord.length?`<div><div class="group-h"><h3 style="color:var(--red)">Picked up, no deposit record</h3><span>${x.noRecord.length}</span></div><p class="fine" style="margin:0 4px 6px">Brinks picked these barcodes up, but they never appeared on a deposit report. Often an empty or void bag; worth a call to Brinks if not.</p><div class="mini">${x.noRecord.map(b=>`<div class="mini-r"><span>${esc(b[0])}</span><small>picked up ${dt(b[1])}</small></div>`).join("")}</div></div>`:""}
+  <div><div class="group-h"><h3>Bags in the safe</h3><span>${x.bags}</span></div><div class="mini">${bagRows(x.inSafe,"Nothing waiting for pickup")}</div></div>
+  <div><div class="group-h"><h3>Pickup history</h3><span>${x.history.length}</span></div><div class="mini">${x.history.map(h=>`<div class="mini-r"><span>${dt(h.at)}</span><span class="muted">${h.bags} bag${h.bags===1?"":"s"}</span></div>`).join("")||`<div class="mini-r"><span class="muted">No pickups on file</span></div>`}</div></div>
+  ${S.me.isAdmin?`<form class="form" id="sf"><label>Safe limit for this safe (blank = default ${money(S.safe.limit)})<input id="s-l" inputmode="numeric" value="${x.limit!==S.safe.limit?x.limit:""}"></label>
+    <p class="err" id="s-err"></p><button class="btn primary" type="submit">Save</button></form>`:""}</div>`);
+  const f=$("sf"); if(f) f.onsubmit=async ev=>{ ev.preventDefault();
+    const r=await api("saveStore",{id,safeLimit:$("s-l").value.replace(/[$,]/g,"")}); if(!r.ok){ $("s-err").textContent=errText(r); return; }
     S.safe=r; closeSheet(); render(); toast("Saved"); };
 }
 

@@ -153,7 +153,10 @@ function reconOnly() {
   netWindow_(win);
 }
 
-function ingestAll() { ingestRQ(); ingestBrinks(); }
+function ingestAll() {
+  ingestRQ(); ingestBrinks();
+  try { if (typeof ingestPickups === 'function') ingestPickups(); } catch (e) { logRun('Pickups ingest error: ' + e.message); }
+}
 
 // ───────────────────────── INGEST: RQ ─────────────────────────
 function ingestRQ() {
@@ -195,12 +198,12 @@ function parseRQRows(rows, bizDate, fileName) {
 }
 
 // ───────────────────────── INGEST: BRINKS ─────────────────────────
-function ingestBrinks() {
+function ingestBrinks(query) {
   var cfg = getCfg_();
   var props = PropertiesService.getScriptProperties();
   var outFolder = folderByPath_(cfg.BRINKS_FOLDER_PATH, true);
   var label = gmailLabel_('Brinks/Processed');
-  var threads = GmailApp.search(cfg.BRINKS_QUERY);
+  var threads = GmailApp.search(query || cfg.BRINKS_QUERY);
   threads.forEach(function (t) {
     t.getMessages().forEach(function (msg) {
       if (props.getProperty('br_' + msg.getId())) return;
