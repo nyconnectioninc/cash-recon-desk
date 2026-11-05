@@ -96,6 +96,9 @@ DESK2.PICK_H = ['Bag', 'Picked At', 'Store ID', 'Location', 'Type', 'Ingested'];
 
 /** Weekly "Pick up and Delivery" email (and any xlsx dropped in Drive › Brinks Recon › Brinks Pickups) → Brinks_Pickups. */
 function ingestPickups() {
+  if (ss_().getSpreadsheetTimeZone() !== Session.getScriptTimeZone()) { desk2FixTimezone(); return; }   // one-time self-heal
+  var P0 = PropertiesService.getScriptProperties();
+  if (!P0.getProperty('brinks_backfill_done')) { brinksBackfill(); P0.setProperty('brinks_backfill_done', '1'); }   // one-time: deposit history since Sept
   var cfg = getCfg_(), props = PropertiesService.getScriptProperties();
   var q = cfg.PICKUP_QUERY || 'from:no-reply@brinksinc.com subject:"Pick up and Delivery" has:attachment newer_than:30d';
   var sh = desk2Tab_(DESK2.PICK, DESK2.PICK_H), have = {}, added = 0;
