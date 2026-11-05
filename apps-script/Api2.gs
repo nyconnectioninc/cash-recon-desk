@@ -165,6 +165,15 @@ function desk2ParseCompact_(txt, have) {
   return out;
 }
 
+/** One-time fix: Control Sheet → Eastern time, then reload the pickup log. */
+function desk2FixTimezone() {
+  ss_().setSpreadsheetTimeZone(Session.getScriptTimeZone());
+  var props = PropertiesService.getScriptProperties(), all = props.getProperties();
+  Object.keys(all).forEach(function (k) { if (/^pkf?_/.test(k)) props.deleteProperty(k); });
+  var sh = desk2Tab_(DESK2.PICK, DESK2.PICK_H); if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 6).clearContent();
+  console.log('Sheet TZ now ' + ss_().getSpreadsheetTimeZone() + '; pickups re-ingested: ' + ingestPickups());
+}
+
 /** One-time: pull every Deposit Report back to a date so pickups have dollar amounts behind them. Safe to re-run. */
 function brinksBackfill() {
   ingestBrinks('from:no-reply@brinksinc.com subject:"Deposit Report" has:attachment after:2026/08/25');

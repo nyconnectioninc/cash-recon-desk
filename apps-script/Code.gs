@@ -562,6 +562,7 @@ function xlsxToValues_(blob, name) {
   var file = Drive.Files.create({ name: 'tmp_' + name, mimeType: MimeType.GOOGLE_SHEETS }, blob);
   try {
     var ss = SpreadsheetApp.openById(file.id);
+    ss.setSpreadsheetTimeZone(Session.getScriptTimeZone());   // read Brinks/RQ wall-clock times as Eastern, not the Drive default
     return ss.getSheets()[0].getDataRange().getValues();
   } finally {
     Drive.Files.remove(file.id);
