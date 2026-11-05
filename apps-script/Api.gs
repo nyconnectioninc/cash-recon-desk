@@ -39,6 +39,7 @@ function deskSetup() {
     a.setFrozenRows(1);
   }
   deskSecret_();
+  desk2Setup();
   return 'Desk setup complete';
 }
 
@@ -51,6 +52,7 @@ function doPost(e) {
   try {
     if (b.action === 'requestCode') return deskJson_(deskRequestCode_(b.email));
     if (b.action === 'verifyCode') return deskJson_(deskVerifyCode_(b.email, b.code));
+    if (b.action === 'requestAccess') return deskJson_(desk2RequestAccess_(b));
     var me = deskAuth_(b.token);
     if (!me) return deskJson_({ ok: false, error: 'signed_out' });
     switch (b.action) {
@@ -61,6 +63,8 @@ function doPost(e) {
       case 'users':     return deskJson_(deskUsers_(me));
       case 'saveUser':  return deskJson_(deskSaveUser_(me, b));
     }
+    var more = desk2Route_(me, b);
+    if (more) return deskJson_(more);
     return deskJson_({ ok: false, error: 'unknown_action' });
   } catch (err) {
     return deskJson_({ ok: false, error: 'server_error', message: String(err && err.message || err) });
@@ -201,15 +205,17 @@ function deskBootstrap_(me) {
     var s = sc.map.byWZ[w]; return { wz: w, name: String(s.name), company: String(s.company || ''), dm: s.dm, active: s.active };
   }).sort(function (a, b) { return a.name < b.name ? -1 : 1; });
   var cfg = getCfg_(), run = readTab_(TABS.RUN).slice(-1)[0];
+  var pending = 0;
+  if (me.isAdmin) readTab_(DESK2.REQ).forEach(function (r) { if (String(r[6]) === 'Pending') pending++; });
   return { ok: true, me: me, days: days, carry: carry, stores: stores, tolerance: Number(cfg.TOLERANCE) || 5,
-    testMode: isTest_(cfg), lastRun: run ? { at: run[0] instanceof Date ? run[0].getTime() : null, msg: String(run[1]).slice(0, 160) } : null };
+    safeLimit: Number(cfg.SAFE_LIMIT) || 5000, locks: desk2Locks_(), pendingRequests: pending, testMode: isTest_(cfg), lastRun: run ? { at: run[0] instanceof Date ? run[0].getTime() : null, msg: String(run[1]).slice(0, 160) } : null };
 }
 
 function deskDay_(me, date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'bad_date' };
   var sc = deskScope_(me);
   var rows = deskLogRows_().map(deskRow_).filter(function (r) { return r.date === date && sc.allowed[r.wz]; });
-  var bags = {}, cash = {};
+  var bags = {}, cash = {}, allocs = desk2Allocs_().filter(function (a) { return sc.allowed[a.wz] && (a.date === date || a.depDate === date); });
   readTab_(TABS.BR).forEach(function (b) {
     var w = String(b[13] || ''); if (normDate_(b[12]) !== date || !sc.allowed[w]) return;
     (bags[w] = bags[w] || []).push({ barcode: String(b[0]), created: b[2] instanceof Date ? b[2].getTime() : String(b[2]), by: String(b[5]),
@@ -219,7 +225,7 @@ function deskDay_(me, date) {
     var w = String(r[1] || ''); if (normDate_(r[0]) !== date || !sc.allowed[w]) return;
     (cash[w] = cash[w] || []).push({ tx: String(r[3]), by: String(r[5]), amount: Number(r[6]) || 0 });
   });
-  return { ok: true, date: date, rows: rows, bags: bags, cash: cash };
+  return { ok: true, date: date, rows: rows, bags: bags, cash: cash, allocs: allocs, locked: desk2Locks_()[date] || null };
 }
 
 function deskStore_(me, wz, days) {
@@ -227,7 +233,7 @@ function deskStore_(me, wz, days) {
   if (!sc.allowed[wz]) return { ok: false, error: 'not_allowed' };
   var rows = deskLogRows_().map(deskRow_).filter(function (r) { return r.wz === wz; })
     .sort(function (a, b) { return a.date < b.date ? 1 : -1; }).slice(0, Math.min(days, 120));
-  return { ok: true, wz: wz, rows: rows };
+  return { ok: true, wz: wz, rows: rows, allocs: desk2Allocs_().filter(function (a) { return a.wz === wz; }) };
 }
 
 /* ---------- edits (Editor / Admin) ---------- */
@@ -237,6 +243,7 @@ function deskSaveAdj_(me, b) {
   var adj = b.adj === '' || b.adj === null || b.adj === undefined ? '' : Number(b.adj);
   if (adj !== '' && (isNaN(adj) || Math.abs(adj) > 100000)) return { ok: false, error: 'bad_amount' };
   if (adj !== '' && adj !== 0 && !String(b.reason || '').trim()) return { ok: false, error: 'reason_required' };
+  if (desk2Locks_()[date]) return { ok: false, error: 'day_locked' };
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var sh = sheet_(TABS.LOG, LOG_HEADERS), v = sh.getDataRange().getValues();

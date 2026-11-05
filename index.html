@@ -195,6 +195,53 @@ h3{font-size:15px;margin:0;font-weight:650}
   .sheet{top:auto;left:0;width:100%;height:92%;border-radius:14px 14px 0 0;transform:translateY(105%)}
   .pick{max-width:150px}
 }
+/* v2 */
+.tiles.t4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:860px){.tiles.t4{grid-template-columns:repeat(2,minmax(0,1fr))}.tiles.t4 .tile:first-child{grid-column:auto}}
+.p-combo{background:color-mix(in srgb,var(--indigo) 16%,transparent);color:var(--indigo)}
+.lockbar{display:flex;gap:12px;align-items:center;justify-content:space-between;background:var(--surface);border-radius:var(--r-lg);padding:10px 14px;font-size:14px;color:var(--muted);flex-wrap:wrap}
+.lockbar.on{background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--fg)}
+.suggest{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:color-mix(in srgb,var(--green) 12%,var(--surface-2));border-radius:10px;padding:10px;font-size:13px}
+.days{display:flex;flex-direction:column;gap:6px}
+.days label{flex-direction:row!important;align-items:center;gap:8px!important;color:var(--fg)!important;font-weight:500!important;font-size:14px!important}
+.days.dow{flex-direction:row;flex-wrap:wrap;gap:12px}
+.chip{background:var(--fill);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:500}
+.th.safe-g,.tr.safe-g{grid-template-columns:minmax(0,1.4fr) 110px 90px 100px 100px 100px minmax(120px,1fr)}
+.meter{display:flex;flex-direction:column;gap:3px}
+.meter i{display:block;height:6px;border-radius:3px;max-width:100%}
+.meter{background:none}
+.meter::before{content:"";display:block;height:6px;border-radius:3px;background:var(--fill);margin-bottom:-9px}
+.meter small{font-size:11px;color:var(--muted)}
+.tr.score-g{grid-template-columns:minmax(0,1.3fr) minmax(120px,1fr) 40px minmax(0,1.3fr)}
+.sbar{display:flex;height:8px;border-radius:4px;background:var(--fill);overflow:hidden}
+.sbar i{display:block;height:100%}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal .dow{font-size:12px;color:var(--muted);font-weight:600;text-align:center}
+.cal-d{position:relative;aspect-ratio:1.7;border-radius:10px;background:color-mix(in srgb,var(--c,var(--fill)) 18%,var(--surface-2));border-left:3px solid var(--c,transparent);text-align:left;padding:6px 7px;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.cal-d b{font-size:13px}.cal-d small{font-size:11px;color:var(--c,var(--muted));font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-d.none{opacity:.45;cursor:default;background:var(--surface-2)}
+.cal-d .lk{position:absolute;top:4px;right:5px;font-size:10px;font-style:normal}
+.req{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:12px 14px;flex-wrap:wrap}
+.req+.req{box-shadow:inset 0 1px 0 var(--sep)}
+.req .st{flex:1;min-width:220px}
+.req-a{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.req-a select,.req-a input{border:1px solid var(--sep);background:var(--surface-2);border-radius:10px;padding:7px 9px;min-width:0}
+.perm .pr{display:grid;grid-template-columns:minmax(0,2fr) repeat(5,minmax(0,1fr));gap:8px;padding:9px 14px;font-size:13px;align-items:center}
+.perm .pr+.pr{box-shadow:inset 0 1px 0 var(--sep)}
+.perm .ph{font-weight:600;color:var(--muted);font-size:12px}
+.perm .yes{color:var(--green);font-weight:700}.perm .no{color:var(--faint)}.perm .part{color:var(--accent);font-weight:600}
+@media (max-width:860px){
+  .th.safe-g{display:none}
+  .tr.safe-g{grid-template-columns:minmax(0,1fr) auto}
+  .tr.safe-g>span:nth-child(2),.tr.safe-g>span:nth-child(3),.tr.safe-g>span:nth-child(5),.tr.safe-g>span:nth-child(6){display:none}
+  .tr.safe-g .meter{grid-column:1/-1}
+  .tr.score-g{grid-template-columns:minmax(0,1fr) 40px}
+  .tr.score-g .sbar,.tr.score-g .dm{grid-column:1/-1}
+  .tr.score-g .dm{display:block}
+  .perm .pr{grid-template-columns:minmax(0,1.6fr) repeat(5,minmax(0,1fr));font-size:11px;padding:8px 10px;gap:4px}
+  .cal-d{aspect-ratio:auto;min-height:48px;padding:4px}
+  .cal-d small{font-size:9px}
+}
 @media (prefers-reduced-motion:reduce){.sheet,.scrim,.toast{transition:none}}
 </style>
 </head>
@@ -226,6 +273,9 @@ const IC = {
   prev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
   next:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
   x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  safe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5V7M15.5 12H17M7 20v1.5M17 20v1.5"/></svg>',
+  score:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>',
+  export:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>',
   search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>'
 };
 
@@ -238,6 +288,9 @@ const baseStatus = r => String(r.finalStatus||r.status).replace(/ \(adj\)$/,"");
 const isOpen = r => !/RESOLVED/.test(r.finalStatus) && !!(STATUS[baseStatus(r)]||{}).open;
 function pill(r){
   const fs=String(r.finalStatus||r.status);
+  const ar=String(r.adjReason||"");
+  if(/Combined deposit/.test(ar)) return `<span class="pill p-combo">Combined${/RESOLVED/.test(fs)?"":" · "+esc((STATUS[baseStatus(r)]||{}).label||"")}</span>`;
+  if(/Matched extra deposit/.test(ar)&&/RESOLVED/.test(fs)) return `<span class="pill p-ok">Matched</span>`;
   if(/RESOLVED \(manual\)/.test(fs)) return `<span class="pill p-ok">Resolved</span>`;
   if(/RESOLVED/.test(fs)) return `<span class="pill p-ok">Late drop · nets $0</span>`;
   const s=STATUS[baseStatus(r)]||{cls:"p-minor",label:fs};
@@ -257,7 +310,8 @@ async function api(action,payload){
 }
 const errText = r => ({not_configured:"The dashboard isn't connected to its backend yet.",network:"Couldn't reach the server. Check your connection.",
   read_only:"Your access is view-only.",reason_required:"Add a reason for the adjustment.",bad_amount:"Enter a valid amount.",
-  admin_only:"Only admins can do that.",cant_remove_self:"You can't remove your own admin access.",server_error:"The server hit an error. Try again."})[r&&r.error]||"Something went wrong. Try again.";
+  admin_only:"Only admins can do that.",day_locked:"That day is closed. An admin has to reopen it first.",no_extra:"There's no extra amount on this day to move.",
+  pick_days:"Pick at least one earlier day.",nothing_to_move:"Those days have nothing open to cover.",not_allowed:"That store isn't in your access.",bad_date:"Pick a valid date.",cant_remove_self:"You can't remove your own admin access.",server_error:"The server hit an error. Try again."})[r&&r.error]||"Something went wrong. Try again.";
 
 /* ---------- session ---------- */
 function loadSession(){ try{ const x=JSON.parse(localStorage.getItem(TOKEN_KEY)||"null"); if(x&&x.token&&x.expires>Date.now()){ S.token=x.token; S.me=x.me; } }catch(e){} }
@@ -272,10 +326,11 @@ function renderLogin(email,msg){
       <div class="field"><label for="l-code">Code</label><input id="l-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></div>
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" id="l-back">Use a different email</button>`
     :`<div class="field"><label for="l-email">Work email</label><input id="l-email" type="email" autocomplete="email" required placeholder="name@wireless-zone.com"></div>
-      <button class="btn primary" type="submit">Email me a code</button>`}
+      <button class="btn primary" type="submit">Email me a code</button><button class="btn" type="button" id="l-req">Request access</button>`}
     <p class="err" id="l-err" role="alert">${esc(msg||"")}</p></form></div>`;
   setTimeout(()=>{ const i=$(email?"l-code":"l-email"); i&&i.focus(); },30);
   const back=$("l-back"); if(back) back.onclick=()=>renderLogin(null);
+  const rq=$("l-req"); if(rq) rq.onclick=()=>renderRequest();
   $("lf").onsubmit=async ev=>{
     ev.preventDefault(); const f=$("lf"), btn=f.querySelector(".btn.primary"), err=$("l-err"); err.textContent="";
     if(!f.dataset.email){
@@ -310,8 +365,9 @@ async function loadDay(d,force){
 /* ---------- shell ---------- */
 function navItems(){
   const b=S.boot, open=(b&&b.carry?b.carry.length:0);
-  const it=[["day","Daily recon",IC.day,"var(--accent)",""],["open","Still open",IC.open,"var(--red)",open?String(open):""],["stores","Stores",IC.store,"var(--green)",b?String(b.stores.length):""]];
-  if(S.me&&S.me.isAdmin) it.push(["team","Team access",IC.team,"var(--indigo)",""]);
+  const it=[["day","Daily recon",IC.day,"var(--accent)",""],["open","Still open",IC.open,"var(--red)",open?String(open):""],["safe","Safe tracker",IC.safe,"var(--orange)",""],
+    ["score","Scorecard",IC.score,"var(--purple)",""],["cal","Store calendar",IC.day,"var(--teal)",""],["stores","Stores",IC.store,"var(--green)",b?String(b.stores.length):""],["export","Export",IC.export,"var(--faint)",""]];
+  if(S.me&&S.me.isAdmin) it.push(["team","People & access",IC.team,"var(--indigo)",b&&b.pendingRequests?String(b.pendingRequests):""]);
   return it;
 }
 function renderShell(){
@@ -321,7 +377,7 @@ function renderShell(){
 function renderSide(){
   const b=S.boot;
   $("side").innerHTML=`<div class="brand"><span class="nyc-logo" role="img" aria-label="NY Connection"></span><span class="brand-sub">CASH RECON DESK</span></div>
-  <div><nav class="nav">${navItems().map(([k,l,ic,c,n])=>`<button data-view="${k}" ${S.view===k?'aria-current="page"':""}><span class="ico" style="background:${c}">${ic}</span><span class="lbl">${l}</span><span class="cnt ${k==="open"&&n?"bad":""}">${n}</span></button>`).join("")}</nav></div>
+  <div><nav class="nav">${navItems().map(([k,l,ic,c,n])=>`<button data-view="${k}" ${S.view===k?'aria-current="page"':""}><span class="ico" style="background:${c}">${ic}</span><span class="lbl">${l}</span><span class="cnt ${(k==="open"||k==="team")&&n?"bad":""}">${n}</span></button>`).join("")}</nav></div>
   ${b&&b.days.length?`<div><div class="nav-h">RECENT DAYS</div><nav class="nav">${b.days.slice(0,10).map(d=>`<button data-day="${d.date}" ${S.view==="day"&&S.date===d.date?'aria-current="page"':""}><span class="lbl">${dayLabel(d.date)}</span><span class="cnt ${d.open?"bad":""}">${d.open?d.open+" open":"✓"}</span></button>`).join("")}</nav></div>`:""}
   <div class="side-foot"><div><b style="color:var(--fg)">${esc(S.me&&S.me.name||"")}</b><br>${esc(S.me&&S.me.role||"")}</div>
   ${b&&b.lastRun&&b.lastRun.at?`<div>Last engine run ${new Date(b.lastRun.at).toLocaleString("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"})}</div>`:""}
@@ -331,14 +387,16 @@ function renderSide(){
   $("so").onclick=()=>signOut();
 }
 function mbar(){ return `<div class="mbar">${navItems().map(([k,l,,,n])=>`<button data-mview="${k}" ${S.view===k?'aria-current="page"':""}>${l}${n&&k==="open"?` · ${n}`:""}</button>`).join("")}<button data-mview="signout">Sign out</button></div>`; }
-function go(v){ S.view=v; if(v==="team"&&!S.users) loadUsers(); render(); window.scrollTo(0,0); }
+function go(v){ S.view=v; render(); window.scrollTo(0,0);
+  if(v==="team"){ if(!S.users) loadUsers(); loadReqs(); }
+  if(v==="safe") loadSafe(); if(v==="score"&&!S.scoreData) loadScore(); if(v==="cal"&&!S.calData) loadCal(); }
 
 function render(){
   if(!S.token){ renderLogin(); return; }
   renderShell(); if(!S.boot) return; renderSide();
   const m=$("main");
   m.innerHTML=`<div class="wrap">${mbar()}${S.boot.testMode&&S.me.isAdmin?`<div class="banner"><b>Test mode is on.</b> The daily alert email only goes to the admin + recon team. DMs aren't emailed yet.</div>`:""}${
-    S.view==="day"?viewDay():S.view==="open"?viewOpen():S.view==="stores"?viewStores():viewTeam()}</div>`;
+    ({day:viewDay,open:viewOpen,stores:viewStores,team:viewPeople,safe:viewSafe,score:viewScore,cal:viewCal,export:viewExport}[S.view]||viewDay)()}</div>`;
   m.querySelectorAll("[data-mview]").forEach(x=>x.onclick=()=>x.dataset.mview==="signout"?signOut():go(x.dataset.mview));
   bindView();
 }
@@ -388,6 +446,7 @@ function viewDay(){
     <div class="daynav"><button class="iconbtn" id="dprev" ${i>=b.days.length-1?"disabled":""} aria-label="Previous day">${IC.prev}</button>
       <select class="datesel" id="dsel" aria-label="Pick a day">${b.days.map(d=>`<option value="${d.date}" ${d.date===S.date?"selected":""}>${dayLabel(d.date)}${d.open?` · ${d.open} open`:""}</option>`).join("")}</select>
       <button class="iconbtn" id="dnext" ${i<=0?"disabled":""} aria-label="Next day">${IC.next}</button></div></div>
+  ${lockBar()}
   <div class="tiles">
     ${tile("ok","Reconciled",`${sum.matched}<span class="muted" style="font-size:16px"> / ${sum.total}</span>`,`${Math.round(sum.matched/Math.max(1,sum.total)*100)}% of stores`,"var(--green)")}
     ${tile("missing","Missing deposit",sum.missing,data?money(amt("MISSING DEPOSIT")):"","var(--red)")}
@@ -480,7 +539,7 @@ async function rowSheet(date,wz){
   let day=S.days[date]; if(!day){ await loadDay(date); day=S.days[date]; }
   const r=(day&&day.rows||[]).find(x=>x.wz===wz) || (S.boot.carry||[]).find(x=>x.wz===wz&&x.date===date); if(!r) return;
   S.sel={date,wz}; document.querySelectorAll(".tr").forEach(x=>x.classList.toggle("sel",x.dataset.row===date+"|"+wz));
-  const bags=(day&&day.bags[wz])||[], cash=(day&&day.cash[wz])||[], can=S.me.canEdit;
+  const bags=(day&&day.bags[wz])||[], cash=(day&&day.cash[wz])||[], can=S.me.canEdit&&!isLocked(date);
   const fmtT=t=>typeof t==="number"?new Date(t).toLocaleString("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"}):esc(t);
   openSheet(`<div class="sh-head"><div><div class="eyebrow">${dayLabel(date,true).toUpperCase()}</div><h2 id="sh-t">${esc(r.store)}</h2></div><button class="iconbtn" data-close aria-label="Close">${IC.x}</button></div>
   <div class="sh-body">
@@ -499,6 +558,7 @@ async function rowSheet(date,wz){
     <div><div class="group-h"><h3>Brinks bags counted for this day</h3><span>${bags.length}</span></div>
       <div class="mini">${bags.map(g=>`<div class="mini-r"><span>${esc(g.by)} · ${fmtT(g.created)}</span><b class="num">${money(g.amount)}</b>
         <small>${esc(g.barcode)} · ${esc(g.status)}${g.storeId?` · Brinks ID ${esc(g.storeId)}`:""}${g.comments?` · “${esc(g.comments)}”`:""}${g.note?`<br>${esc(g.note)}`:""}</small></div>`).join("")||`<div class="mini-r"><span class="muted">No Brinks bag assigned to this day</span></div>`}</div></div>
+    <div id="alloc-box"></div>
     <div><div class="group-h"><h3>Last 30 days</h3><span id="h-sum"></span></div><div class="card" id="h-box"><div class="hist muted" style="font-size:13px;align-items:center">Loading…</div></div></div>
     ${can?`<form class="form" id="af"><h3>Adjustment / note</h3>
       <div class="row2"><label>Adjust $<input id="a-amt" inputmode="decimal" placeholder="0.00" value="${r.adj===""?"":esc(r.adj)}"></label>
@@ -508,7 +568,7 @@ async function rowSheet(date,wz){
       <label>Note<textarea id="a-note" placeholder="What happened, who confirmed it">${esc(r.note)}</textarea></label>
       <p class="err" id="a-err"></p><button class="btn primary" type="submit">Save</button>
       <p class="fine">Adjustment is added to the difference. If the result is within the $${S.boot.tolerance} tolerance, the store shows Resolved. The engine never overwrites these fields.</p></form>`
-    :`<p class="fine">View only. Ask an editor to log adjustments.</p>`}
+    :`<p class="fine">${isLocked(date)?`🔒 ${lockedMsg(date)}. Reopen the day to change it.`:"View only. Ask an editor to log adjustments."}</p>`}
   </div>`);
   if(can){
     $("af").querySelectorAll("[data-fill]").forEach(b=>b.onclick=()=>{ $("a-amt").value=b.dataset.fill; $("a-rsn").focus(); });
@@ -517,13 +577,14 @@ async function rowSheet(date,wz){
       const res=await api("saveAdj",{date,wz,adj,reason:$("a-rsn").value,note:$("a-note").value}); btn.disabled=false;
       if(!res.ok){ $("a-err").textContent=errText(res); return; }
       const d=S.days[date]; if(d){ const k=d.rows.findIndex(x=>x.wz===wz); if(k>=0) d.rows[k]=res.row; }
-      toast("Saved"); const b=await api("bootstrap"); if(b.ok) S.boot=b; render(); rowSheet(date,wz); };
+      toast("Saved"); dropCaches(); const b=await api("bootstrap"); if(b.ok) S.boot=b; render(); rowSheet(date,wz); };
   }
-  histInto(wz,date);
+  const hr=await histInto(wz,date); const ab=$("alloc-box");
+  if(ab&&hr&&hr.ok&&S.sel&&S.sel.wz===wz&&S.sel.date===date){ ab.innerHTML=allocHtml(r,hr.rows,hr.allocs); bindAlloc(r); }
 }
 async function histInto(wz,date){
-  const r=await api("store",{wz,days:30}); const box=$("h-box"); if(!box) return;
-  if(!r.ok){ box.innerHTML=`<span class="muted">${esc(errText(r))}</span>`; return; }
+  const r=await api("store",{wz,days:30}); const box=$("h-box"); if(!box) return r;
+  if(!r.ok){ box.innerHTML=`<span class="muted">${esc(errText(r))}</span>`; return r; }
   const rows=r.rows.slice().reverse(), mx=Math.max(1,...rows.map(x=>Math.abs(x.finalDiff)));
   const open=r.rows.filter(isOpen).length;
   $("h-sum").textContent=`${open} open of ${r.rows.filter(x=>x.status!=="NO ACTIVITY").length} days`;
@@ -531,6 +592,7 @@ async function histInto(wz,date){
     return `<i data-hday="${x.date}" title="${dayLabel(x.date)} · ${esc((STATUS[baseStatus(x)]||{}).label||x.finalStatus)} · ${money(x.finalDiff,1)}" style="height:${h}px;background:${o?(STATUS[baseStatus(x)]||{}).color:"var(--green)"};${x.date===date?"outline:2px solid var(--accent);outline-offset:1px":""}"></i>`; }).join("")}</div>
     <p class="fine" style="margin-top:6px">Green = reconciled. Taller bars = bigger open difference. Tap a bar to open that day.</p>`;
   box.querySelectorAll("[data-hday]").forEach(x=>x.onclick=()=>{ S.view="day"; loadDay(x.dataset.hday).then(()=>rowSheet(x.dataset.hday,wz)); });
+  return r;
 }
 async function storeSheet(wz){
   const s=S.boot.stores.find(x=>x.wz===wz);
@@ -544,6 +606,280 @@ async function storeSheet(wz){
     <div class="tbl" style="margin-top:14px">${r.rows.map(x=>`<button class="tr" data-row="${x.date}|${x.wz}" style="grid-template-columns:minmax(0,1fr) auto auto"><span class="st"><b>${dayLabel(x.date)}</b><small class="num">RQ ${money(x.rq)} · Brinks ${money(x.brinks)}</small></span>
       <span class="num ${x.finalDiff<-0.004?"neg":x.finalDiff>0.004?"pos":""}">${Math.abs(x.finalDiff)<.005?"—":money(x.finalDiff,1)}</span><span class="cell-st">${pill(x)}</span></button>`).join("")}</div>`;
   el.querySelectorAll("[data-row]").forEach(x=>x.onclick=()=>{ const [d,w]=x.dataset.row.split("|"); S.view="day"; loadDay(d).then(()=>rowSheet(d,w)); });
+}
+
+/* ================= v2 features ================= */
+const REASONS = ["Store closed / holiday","Brinks missed pickup","Safe or bag malfunction","Manager error"];
+const EXCUSED = REASONS.slice(0,3);
+const ymd = d => d.toISOString().slice(0,10);
+const addD = (s,n) => { const d=new Date(s+"T12:00:00Z"); d.setUTCDate(d.getUTCDate()+n); return ymd(d); };
+const isLocked = d => !!(S.boot && S.boot.locks && S.boot.locks[d]);
+const lockedMsg = d => { const l=S.boot.locks[d]; return `Closed by ${esc(l.by)}${l.at?` on ${new Date(l.at).toLocaleDateString("en-US",{month:"numeric",day:"numeric"})}`:""}`; };
+async function getRange(from,to){
+  const k=from+"|"+to; S.range=S.range||{};
+  if(S.range[k]) return S.range[k];
+  const r=await api("range",{from,to}); if(!r.ok){ toast(errText(r)); return null; }
+  const c=r.cols; r.list=r.rows.map(a=>{ const o={}; c.forEach((k,i)=>o[k]=a[i]); return o; });
+  S.range[k]=r; return r;
+}
+function dropCaches(){ S.range={}; S.safe=null; }
+
+/* ---------- Close / reopen day ---------- */
+function lockBar(){
+  const d=S.date, l=isLocked(d);
+  if(!S.me.canEdit && !l) return "";
+  const btn = l ? (S.me.isAdmin?`<button class="btn" id="unlock">Reopen day</button>`:"") : `<button class="btn" id="lockday">Close day</button>`;
+  return `<div class="lockbar ${l?"on":""}"><span>${l?`🔒 <b>Day closed.</b> ${lockedMsg(d)}. Adjustments are locked${S.me.isAdmin?"; reopen to change anything":""}.`:"Close the day once every exception is explained. Closing locks edits; only an Admin can reopen."}</span>${btn}</div>`;
+}
+async function setLock(lock){
+  const r=await api("lockDay",{date:S.date,lock}); if(!r.ok){ toast(errText(r)); return; }
+  S.boot.locks=r.locks; toast(lock?"Day closed":"Day reopened"); render();
+}
+
+/* ---------- Combined deposit + extra-$ matcher (store panel) ---------- */
+function bestSubset(cands, extra, tol){
+  const c=cands.slice(0,14); let best=null, gap=Infinity;
+  for(let m=1;m<(1<<c.length);m++){ let s=0, pick=[]; for(let i=0;i<c.length;i++) if(m&(1<<i)){ s+=c[i].need; pick.push(c[i]); }
+    const g=Math.abs(s-extra); if(g<=tol && (g<gap-0.001 || (Math.abs(g-gap)<0.001 && pick.length<best.length))){ best=pick; gap=g; } }
+  return best;
+}
+function allocHtml(r, hist, allocs){
+  if(!S.me.canEdit || isLocked(r.date)) return "";
+  const tol=S.boot.tolerance, extra=r.finalDiff;
+  const own=(allocs||[]).filter(a=>a.depDate===r.date||a.date===r.date);
+  const ids=[...new Set(own.map(a=>a.id))];
+  let h=ids.length?`<div><div class="group-h"><h3>Combined / matched deposits</h3></div><div class="mini">${ids.map(id=>{ const it=own.filter(a=>a.id===id).length?(allocs.filter(a=>a.id===id)):[]; const dep=it[0];
+    return `<div class="mini-r"><span><b>${id.startsWith("CD")?"Combined deposit":"Matched extra $"}</b> · ${esc(dep.reason)}${dep.excused?' <span class="pill p-ok">excused</span>':""}</span><button class="btn" data-undo="${esc(id)}">Undo</button>
+      <small>${it.filter(a=>a.amount>0).map(a=>`${dayLabel(a.date)} ${money(a.amount)}`).join(" · ")} ← from ${dayLabel(dep.depDate)} · ${esc(dep.by)}</small></div>`; }).join("")}</div></div>`:"";
+  if(extra<=tol || !hist) return h;
+  const cands=hist.filter(x=>x.date<r.date && x.date>=addD(r.date,-14) && isOpen(x) && x.finalDiff<-tol && !isLocked(x.date))
+    .map(x=>({date:x.date, need:Math.round(-x.finalDiff*100)/100, st:baseStatus(x)})).sort((a,b)=>a.date<b.date?-1:1);
+  if(!cands.length) return h+`<div class="card" style="font-size:13px;color:var(--muted)">This store is ${money(extra)} over, but has no open short or missing days in the 2 weeks before. If it's a mistake, log an adjustment below.</div>`;
+  const best=bestSubset(cands,extra,tol), run=[]; for(let i=cands.length-1;i>=0&&cands[i].st==="MISSING DEPOSIT";i--) run.unshift(cands[i]);
+  h+=`<form class="form" id="cf"><h3>Extra ${money(extra)} on this day</h3>
+    ${best?`<div class="suggest"><span>Matches <b>${best.map(c=>`${dayLabel(c.date)} (${(STATUS[c.st]||{}).label} ${money(c.need)})`).join(" + ")}</b>${Math.abs(best.reduce((t,c)=>t+c.need,0)-extra)>0.004?` · within $${tol}`:" exactly"}.</span>
+      <button type="button" class="btn primary" id="applymatch" data-days="${best.map(c=>c.date).join(",")}">Apply match</button></div>`:""}
+    <p class="fine" style="margin:0">Or treat it as <b>one deposit covering several days</b>. Pick the days it covers; money goes to the oldest day first and anything left stays on this day.</p>
+    <div class="days">${cands.map(c=>`<label><input type="checkbox" value="${c.date}" ${run.some(x=>x.date===c.date)?"checked":""}> ${dayLabel(c.date)} <span class="muted">${(STATUS[c.st]||{}).label} ${money(c.need)}</span></label>`).join("")}</div>
+    <label>Reason (required)<select id="c-r"><option value="">Choose a reason…</option>${REASONS.map(x=>`<option>${x}</option>`).join("")}</select></label>
+    <p class="fine" style="margin:0">Store closed, Brinks missed pickup and safe malfunction are <b>excused</b> on the scorecard. Manager error counts as late.</p>
+    <p class="err" id="c-err"></p><button class="btn" type="submit">Split as combined deposit</button></form>`;
+  return h;
+}
+function bindAlloc(r){
+  const sheet=$("sheet");
+  sheet.querySelectorAll("[data-undo]").forEach(b=>b.onclick=async()=>{ b.disabled=true; const x=await api("undoAlloc",{id:b.dataset.undo}); if(!x.ok){ toast(errText(x)); b.disabled=false; return; } await afterEdit(r,"Undone"); });
+  const am=$("applymatch"); if(am) am.onclick=async()=>{ am.disabled=true; const x=await api("allocate",{wz:r.wz,depDate:r.date,days:am.dataset.days.split(","),kind:"match"}); if(!x.ok){ toast(errText(x)); am.disabled=false; return; } await afterEdit(r,`Matched ${money(x.moved)}`); };
+  const cf=$("cf"); if(cf) cf.onsubmit=async ev=>{ ev.preventDefault(); const days=[...cf.querySelectorAll("input[type=checkbox]:checked")].map(i=>i.value), reason=$("c-r").value;
+    if(!days.length){ $("c-err").textContent="Pick the days this deposit covers."; return; } if(!reason){ $("c-err").textContent="Pick a reason."; return; }
+    const btn=cf.querySelector("button[type=submit]"); btn.disabled=true;
+    const x=await api("allocate",{wz:r.wz,depDate:r.date,days,reason,kind:"combo"}); btn.disabled=false;
+    if(!x.ok){ $("c-err").textContent=errText(x); return; } await afterEdit(r,`Split ${money(x.moved)} across ${x.moves.length} day${x.moves.length===1?"":"s"}`); };
+}
+async function afterEdit(r,msg){
+  toast(msg); S.days={}; dropCaches(); const b=await api("bootstrap"); if(b.ok) S.boot=b; await loadDay(S.date,true); rowSheet(r.date,r.wz);
+}
+
+/* ---------- Safe Tracker ---------- */
+async function loadSafe(force){ if(S.safe&&!force) return; const r=await api("safe"); if(r.ok){ S.safe=r; render(); } else toast(errText(r)); }
+function viewSafe(){
+  const s=S.safe; if(!s) return `<div class="top"><div><div class="eyebrow">SAFES</div><h1>Safe tracker</h1></div></div><div class="tbl"><div class="empty"><b>Loading…</b></div></div>`;
+  const set=s.stores.filter(x=>x.last), unset=s.stores.filter(x=>!x.last);
+  const over=set.filter(x=>x.drops>x.limit), near=set.filter(x=>x.drops<=x.limit&&x.drops>x.limit*.8), total=set.reduce((t,x)=>t+x.drops,0);
+  const rows=set.slice().sort((a,b)=>b.drops/b.limit-a.drops/a.limit);
+  const tile=(lab,n,meta,c)=>`<div class="tile"><span class="lab"><span class="sw" style="background:${c}"></span>${lab}</span><span class="big num">${n}</span><span class="meta">${meta}</span></div>`;
+  return `<div class="top"><div><div class="eyebrow">SAFES</div><h1>Safe tracker</h1><p class="sub">Cash that should be sitting in each safe since its last Brinks pickup. Bags dropped after ${s.pickupHour>12?s.pickupHour-12+" PM":s.pickupHour+(s.pickupHour===12?" PM":" AM")} on a pickup day count toward the next pickup.</p></div></div>
+  <div class="tiles t4">
+    ${tile("Over limit",over.length,`limit ${money(s.limit)} unless set per store`,"var(--red)")}
+    ${tile("Near limit",near.length,"over 80% of limit","var(--orange)")}
+    ${tile("In safes now",money(total).replace(".00",""),`${set.length} stores tracked`,"var(--accent)")}
+    ${tile("No pickup days",unset.length,S.me.isAdmin?"tap a store to set them":"ask an admin to set them","var(--faint)")}
+  </div>
+  <div class="tbl"><div class="th safe-g"><span>Store</span><span>Pickup days</span><span>Last pickup</span><span class="r">In safe</span><span class="r">RQ since</span><span class="r">Not dropped</span><span>vs. limit</span></div>
+  ${rows.map(x=>{ const p=Math.min(100,x.drops/x.limit*100), c=x.drops>x.limit?"var(--red)":p>80?"var(--orange)":"var(--green)", gap=Math.round((x.rq-x.drops)*100)/100;
+    return `<button class="tr safe-g" data-safe="${x.wz}"><span class="st"><b>${esc(x.name)}</b><small>${esc(x.wz)} · ${esc(x.dm)}</small></span><span class="dm">${esc(x.pickupDays)}</span>
+      <span class="dm">${dayLabel(x.last)}</span><span class="r num"><b>${money(x.drops)}</b><small class="muted" style="display:block;font-size:12px">${x.bags} bag${x.bags===1?"":"s"}</small></span>
+      <span class="r num">${money(x.rq)}</span><span class="r num ${gap>S.boot.tolerance?"neg":""}">${Math.abs(gap)<.005?"—":money(gap)}</span>
+      <span class="meter"><i style="width:${p}%;background:${c}"></i><small>${Math.round(x.drops/x.limit*100)}% of ${money(x.limit).replace(".00","")}</small></span></button>`; }).join("")||`<div class="empty"><b>No pickup schedules yet</b>Set each store's Brinks pickup days to start tracking.</div>`}
+  </div>
+  ${unset.length?`<div><div class="group-h"><h2>Needs pickup days</h2><span>${unset.length}</span></div><div class="card" style="display:flex;flex-wrap:wrap;gap:6px">${unset.map(x=>`<button class="chip" data-safe="${x.wz}">${esc(x.name)}</button>`).join("")}</div></div>`:""}`;
+}
+function safeSheet(wz){
+  const x=S.safe.stores.find(s=>s.wz===wz); if(!x) return;
+  const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], cur=String(x.pickupDays||"").toLowerCase();
+  openSheet(`<div class="sh-head"><div><div class="eyebrow">${esc(wz)}</div><h2 id="sh-t">${esc(x.name)}</h2></div><button class="iconbtn" data-close aria-label="Close">${IC.x}</button></div>
+  <div class="sh-body"><div class="kv">
+    <div class="kv-row"><span class="kv-k">Last pickup</span><span class="kv-v">${x.last?dayLabel(x.last,true):"Not set"}</span></div>
+    <div class="kv-row"><span class="kv-k">In safe</span><span class="kv-v num"><b>${money(x.drops)}</b> · ${x.bags} bags</span></div>
+    <div class="kv-row"><span class="kv-k">RQ since</span><span class="kv-v num">${money(x.rq)}</span></div>
+    <div class="kv-row"><span class="kv-k">Limit</span><span class="kv-v num">${money(x.limit)}</span></div></div>
+  ${S.me.isAdmin?`<form class="form" id="sf"><h3>Brinks pickup schedule</h3><div class="days dow">${DOW.map(d=>`<label><input type="checkbox" value="${d}" ${cur.includes(d.toLowerCase())?"checked":""}> ${d}</label>`).join("")}</div>
+    <label>Safe limit for this store (blank = default ${money(S.safe.limit)})<input id="s-l" inputmode="numeric" value="${x.limit!==S.safe.limit?x.limit:""}"></label>
+    <p class="err" id="s-err"></p><button class="btn primary" type="submit">Save</button></form>`:`<p class="fine">Ask an admin to change pickup days or the limit.</p>`}</div>`);
+  const f=$("sf"); if(f) f.onsubmit=async ev=>{ ev.preventDefault(); const days=[...f.querySelectorAll("input:checked")].map(i=>i.value).join(", ");
+    const r=await api("saveStore",{wz,pickupDays:days,safeLimit:$("s-l").value.replace(/[$,]/g,"")}); if(!r.ok){ $("s-err").textContent=errText(r); return; }
+    S.safe=r; closeSheet(); render(); toast("Saved"); };
+}
+
+/* ---------- Scorecard ---------- */
+async function loadScore(){
+  const n=S.scoreN||5, days=S.boot.days.slice(0,n).map(d=>d.date); if(!days.length) return;
+  const r=await getRange(days[days.length-1],days[0]); if(r){ S.scoreData=r; render(); }
+}
+function scoreRows(list,by){
+  const m={};
+  list.forEach(r=>{ if(r.status==="NO ACTIVITY") return;
+    const k=by==="dm"?String(r.dm).trim()||"—":r.wz, o=m[k]=m[k]||{key:k,name:by==="dm"?k:`${r.store}`,sub:by==="dm"?"":r.wz+" · "+r.dm,miss:0,short:0,late:0,excused:0,days:0};
+    o.days++; const fs=String(r.finalStatus), open=!/RESOLVED/.test(fs)&&/MISSING|SHORT|OVER|BRINKS ONLY/.test(fs), ar=String(r.adjReason||"");
+    const combo=/Combined deposit/.test(ar), exc=combo&&EXCUSED.some(e=>ar.includes(e));
+    if(open&&/MISSING/.test(fs)) o.miss++; else if(open&&/SHORT|OVER/.test(fs)) o.short++;
+    else if(/late drop/.test(fs) || (combo&&!exc) || (/RESOLVED \(manual\)/.test(fs)&&/late/i.test(ar))) o.late++;
+    if(exc) o.excused++;
+  });
+  return Object.values(m).map(o=>({...o,n:o.miss+o.short+o.late})).sort((a,b)=>b.n-a.n||b.miss-a.miss);
+}
+function viewScore(){
+  const by=S.scoreBy||"store", n=S.scoreN||5, d=S.scoreData;
+  const head=`<div class="top"><div><div class="eyebrow">ACCOUNTABILITY</div><h1>Deposit scorecard</h1><p class="sub">Who misses, shorts or deposits late, over the last ${n} business days. Excused combined deposits don't count.</p></div></div>
+  <div class="toolbar"><div class="seg">${[["store","By store"],["dm","By DM"]].map(([k,l])=>`<button data-sby="${k}" aria-pressed="${by===k}">${l}</button>`).join("")}</div>
+    <div class="seg">${[5,10,20].map(k=>`<button data-sn="${k}" aria-pressed="${n===k}">${k} days</button>`).join("")}</div></div>`;
+  if(!d) return head+`<div class="tbl"><div class="empty"><b>Loading…</b></div></div>`;
+  const rows=scoreRows(d.list,by), all=scoreRows(d.list,"store"), sum=k=>all.reduce((t,r)=>t+r[k],0), mx=Math.max(5,...rows.map(r=>r.n));
+  const t=(lab,v,c)=>`<div class="tile"><span class="lab"><span class="sw" style="background:${c}"></span>${lab}</span><span class="big num">${v}</span></div>`;
+  return head+`<div class="tiles t4">${t("No deposit",sum("miss"),"var(--red)")}${t("Short / over",sum("short"),"var(--orange)")}${t("Late",sum("late"),"var(--accent)")}${t("Excused",sum("excused"),"var(--green)")}</div>
+  <div class="tbl">${rows.filter(r=>r.n||r.excused).map(r=>`<button class="tr score-g" ${by==="store"?`data-cal="${r.key}"`:`data-dmf="${esc(r.key)}"`}><span class="st"><b>${esc(r.name)}</b><small>${esc(r.sub||`${r.days} store-days`)}</small></span>
+    <span class="sbar"><i style="width:${r.miss/mx*100}%;background:var(--red)"></i><i style="width:${r.short/mx*100}%;background:var(--orange)"></i><i style="width:${r.late/mx*100}%;background:var(--accent)"></i></span>
+    <span class="r num"><b>${r.n}</b></span><span class="dm" style="font-size:12px">${r.miss} missing · ${r.short} short/over · ${r.late} late${r.excused?` · ${r.excused} excused`:""}</span></button>`).join("")||`<div class="empty"><b>Clean sheet</b>No misses, shorts or late deposits in this window.</div>`}</div>`;
+}
+
+/* ---------- Store calendar ---------- */
+function viewCal(){
+  const st=S.boot.stores, wz=S.calWz||(st[0]&&st[0].wz), month=S.calMonth||(S.date||ymd(new Date())).slice(0,7);
+  const s=st.find(x=>x.wz===wz), d=S.calData;
+  const first=new Date(month+"-01T12:00:00"), startDow=(first.getDay()+6)%7, nDays=new Date(first.getFullYear(),first.getMonth()+1,0).getDate();
+  const by={}; (d?d.list:[]).filter(r=>r.wz===wz).forEach(r=>by[r.date]=r);
+  const color=r=>{ if(!r||r.status==="NO ACTIVITY") return ""; const fs=String(r.finalStatus); if(/Combined deposit/.test(r.adjReason||"")) return "var(--indigo)";
+    if(/RESOLVED/.test(fs)) return /late drop/.test(fs)?"var(--accent)":"var(--green)"; return (STATUS[baseStatus(r)]||{}).color||"var(--green)"; };
+  let cells=""; for(let i=0;i<startDow;i++) cells+=`<span></span>`;
+  for(let i=1;i<=nDays;i++){ const ds=month+"-"+String(i).padStart(2,"0"), r=by[ds], c=color(r);
+    cells+=`<button class="cal-d ${r?"":"none"}" ${r?`data-row="${ds}|${wz}"`:"disabled"} style="${c?`--c:${c}`:""}"><b>${i}</b>${r&&r.status!=="NO ACTIVITY"?`<small class="num">${Math.abs(r.finalDiff)<.005?"✓":money(r.finalDiff,1).replace(".00","")}</small>`:""}${isLocked(ds)?'<i class="lk">🔒</i>':""}</button>`; }
+  const ml=first.toLocaleDateString("en-US",{month:"long",year:"numeric"}), prev=addD(month+"-15",-30).slice(0,7), next=addD(month+"-15",30).slice(0,7);
+  const list=Object.values(by).filter(r=>r.status!=="NO ACTIVITY").sort((a,b)=>a.date<b.date?1:-1);
+  return `<div class="top"><div><div class="eyebrow">STORE CALENDAR</div><h1>${esc(s?s.name:"")}</h1><p class="sub">${esc(wz)} · ${esc(s?s.dm:"")}</p></div>
+    <div class="daynav"><select class="datesel" id="calwz" aria-label="Store">${st.map(x=>`<option value="${x.wz}" ${x.wz===wz?"selected":""}>${esc(x.name)} · ${x.wz}</option>`).join("")}</select></div></div>
+  <div class="card"><div class="trend-h" style="margin-bottom:10px"><div class="daynav"><button class="iconbtn" data-calm="${prev}" aria-label="Previous month">${IC.prev}</button><h3 style="min-width:140px;text-align:center">${ml}</h3><button class="iconbtn" data-calm="${next}" aria-label="Next month">${IC.next}</button></div>
+    <div class="legend" style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)">${[["Reconciled","var(--green)"],["Missing","var(--red)"],["Short","var(--orange)"],["Over","var(--purple)"],["Late drop","var(--accent)"],["Combined","var(--indigo)"]].map(([l,c])=>`<span><i class="sw" style="background:${c};display:inline-block"></i> ${l}</span>`).join("")}</div></div>
+    <div class="cal"><span class="dow">Mon</span><span class="dow">Tue</span><span class="dow">Wed</span><span class="dow">Thu</span><span class="dow">Fri</span><span class="dow">Sat</span><span class="dow">Sun</span>${d?cells:`<div class="empty" style="grid-column:1/-1">Loading…</div>`}</div></div>
+  ${list.length?`<div class="tbl">${list.map(x=>`<button class="tr" data-row="${x.date}|${x.wz}" style="grid-template-columns:minmax(0,1fr) auto auto"><span class="st"><b>${dayLabel(x.date)}</b><small class="num">RQ ${money(x.rq)} · Brinks ${money(x.brinks)}</small></span><span class="num ${x.finalDiff<-0.004?"neg":x.finalDiff>0.004?"pos":""}">${Math.abs(x.finalDiff)<.005?"—":money(x.finalDiff,1)}</span><span class="cell-st">${pill(x)}</span></button>`).join("")}</div>`:""}`;
+}
+async function loadCal(){
+  const month=S.calMonth||(S.date||ymd(new Date())).slice(0,7), from=month+"-01", to=addD(addD(month+"-28",4).slice(0,7)+"-01",-1);
+  const r=await getRange(from,to); if(r){ S.calData=r; render(); }
+}
+
+/* ---------- Export ---------- */
+function viewExport(){
+  const e=S.exp=S.exp||{from:addD(S.boot.days[0]?S.boot.days[0].date:ymd(new Date()),-6),to:S.boot.days[0]?S.boot.days[0].date:ymd(new Date()),fmt:"xlsx",scope:"",secs:{exceptions:1,adjustments:1,combined:1,score:1,log:0}};
+  const dms=[...new Set(S.boot.stores.map(s=>String(s.dm).trim()).filter(Boolean))].sort();
+  const secs=[["exceptions","Exceptions (open items)"],["adjustments","Adjustments & notes"],["combined","Combined & matched deposits"],["score","Scorecard"],["log","Full daily log"]];
+  return `<div class="top"><div><div class="eyebrow">REPORTS</div><h1>Export</h1><p class="sub">Download the recon for any date range. You only get the stores you can see.</p></div></div>
+  <form class="form" id="xf" style="max-width:640px">
+    <div class="row2" style="grid-template-columns:1fr 1fr"><label>From<input type="date" id="x-f" value="${e.from}"></label><label>To<input type="date" id="x-t" value="${e.to}"></label></div>
+    <div class="quick">${[["Yesterday",0],["Last 7 days",6],["Last 30 days",29]].map(([l,n])=>`<button type="button" data-xr="${n}">${l}</button>`).join("")}<button type="button" data-xr="mtd">Month to date</button></div>
+    <label>Stores<select id="x-s"><option value="">All stores I can see (${S.boot.stores.length})</option>${dms.length>1?`<optgroup label="DM">${dms.map(d=>`<option value="dm:${esc(d)}" ${e.scope==="dm:"+d?"selected":""}>${esc(d)}</option>`).join("")}</optgroup>`:""}<optgroup label="Store">${S.boot.stores.map(s=>`<option value="wz:${s.wz}" ${e.scope==="wz:"+s.wz?"selected":""}>${esc(s.name)} · ${s.wz}</option>`).join("")}</optgroup></select></label>
+    <div><div class="kv-k" style="margin-bottom:6px;font-weight:600">Include</div><div class="days">${secs.map(([k,l])=>`<label><input type="checkbox" data-sec="${k}" ${e.secs[k]?"checked":""}> ${l}</label>`).join("")}</div></div>
+    <div><div class="kv-k" style="margin-bottom:6px;font-weight:600">Format</div><div class="seg">${[["xlsx","Excel"],["gsheet","Google Sheet"],["pdf","PDF"]].map(([k,l])=>`<button type="button" data-xfmt="${k}" aria-pressed="${e.fmt===k}">${l}</button>`).join("")}</div></div>
+    <p class="err" id="x-err"></p><button class="btn primary" type="submit" id="x-go">Export</button><div id="x-out"></div></form>`;
+}
+function readExp(){ const e=S.exp; e.from=$("x-f").value; e.to=$("x-t").value; e.scope=$("x-s").value; document.querySelectorAll("[data-sec]").forEach(c=>e.secs[c.dataset.sec]=c.checked?1:0); return e; }
+function expTables(r,e){
+  const sc=e.scope, rows=r.list.filter(x=>!sc||(sc.startsWith("dm:")?String(x.dm).trim()===sc.slice(3):x.wz===sc.slice(3)));
+  const H=["Date","WZ #","Store","DM","RQ","Brinks","Difference","Status","Final Diff","Final Status","Adj $","Adj Reason","Adj By","Note"];
+  const p=x=>[x.date,x.wz,x.store,x.dm,x.rq,x.brinks,x.diff,x.status,x.finalDiff,x.finalStatus,x.adj,x.adjReason,x.adjBy,x.note];
+  const open=x=>!/RESOLVED/.test(x.finalStatus)&&/MISSING|SHORT|OVER|BRINKS ONLY/.test(x.finalStatus);
+  const t=[];
+  if(e.secs.exceptions) t.push(["Exceptions",H,rows.filter(open).map(p)]);
+  if(e.secs.adjustments) t.push(["Adjustments",H,rows.filter(x=>x.adj!==""||x.note).map(p)]);
+  if(e.secs.combined){ const ws=new Set(rows.map(x=>x.wz)); t.push(["Combined & matched",["ID","WZ #","Kind","Deposit date","Covers date","Amount","Reason","Logged by"],r.allocs.filter(a=>ws.has(a.wz)&&a.date>=r.from).map(a=>[a.id,a.wz,a.kind,a.depDate,a.date,a.amount,a.reason,a.by])]); }
+  if(e.secs.score) t.push(["Scorecard",["Store","WZ / DM","Missing","Short/Over","Late","Excused"],scoreRows(rows,"store").map(o=>[o.name,o.sub,o.miss,o.short,o.late,o.excused])]);
+  if(e.secs.log) t.push(["Daily log",H,rows.map(p)]);
+  return t;
+}
+async function runExport(){
+  const e=readExp(), err=$("x-err"), out=$("x-out"), btn=$("x-go"); err.textContent=""; out.innerHTML="";
+  if(!e.from||!e.to||e.from>e.to){ err.textContent="Pick a valid date range."; return; }
+  if(!Object.values(e.secs).some(Boolean)){ err.textContent="Pick at least one section."; return; }
+  btn.disabled=true; btn.textContent="Preparing…";
+  try{
+    if(e.fmt==="gsheet"){
+      const sc=e.scope, r=await api("exportSheet",{from:e.from,to:e.to,sections:Object.keys(e.secs).filter(k=>e.secs[k]),dm:sc.startsWith("dm:")?sc.slice(3):"",wz:sc.startsWith("wz:")?sc.slice(3):""});
+      if(!r.ok){ err.textContent=errText(r); return; } out.innerHTML=`<p class="fine">Created in Drive → Brinks Recon / Exports. <a href="${esc(r.url)}" target="_blank" rel="noopener">Open the Google Sheet</a></p>`; window.open(r.url,"_blank"); return;
+    }
+    const r=await getRange(e.from,e.to); if(!r) return; const t=expTables(r,e), name=`Cash Recon ${e.from} to ${e.to}`;
+    if(e.fmt==="xlsx"){
+      if(!window.XLSX) await new Promise((ok,no)=>{ const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload=ok; s.onerror=no; document.head.appendChild(s); });
+      const wb=XLSX.utils.book_new(); t.forEach(([n,h,rows])=>{ const ws=XLSX.utils.aoa_to_sheet([h].concat(rows)); ws["!cols"]=h.map(()=>({wch:16})); XLSX.utils.book_append_sheet(wb,ws,n.slice(0,31)); });
+      XLSX.writeFile(wb,name+".xlsx"); toast("Excel downloaded");
+    } else {
+      const w=window.open("","_blank"); if(!w){ err.textContent="Allow pop-ups to print the PDF."; return; }
+      w.document.write(`<!doctype html><html><head><title>${esc(name)}</title><style>body{font:11px -apple-system,Helvetica,Arial,sans-serif;margin:24px;color:#1c1c1e}h1{font-size:18px;margin:0 0 2px}h2{font-size:14px;margin:18px 0 6px}table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #ddd;padding:4px 6px;text-align:left}th{background:#f1f3f4}p{color:#6e6e73;margin:0}@page{size:landscape;margin:12mm}</style></head><body>
+        <h1>Cash Recon Desk</h1><p>${esc(e.from)} to ${esc(e.to)} · exported by ${esc(S.me.name)} · ${new Date().toLocaleString()}</p>
+        ${t.map(([n,h,rows])=>`<h2>${esc(n)} (${rows.length})</h2><table><tr>${h.map(x=>`<th>${esc(x)}</th>`).join("")}</tr>${rows.map(rw=>`<tr>${rw.map(c=>`<td>${esc(typeof c==="number"?c.toLocaleString("en-US",{maximumFractionDigits:2}):c)}</td>`).join("")}</tr>`).join("")}</table>`).join("")}</body></html>`);
+      w.document.close(); setTimeout(()=>w.print(),300);
+    }
+  } finally { btn.disabled=false; btn.textContent="Export"; }
+}
+
+/* ---------- People & Access (requests, permissions, settings) ---------- */
+async function loadReqs(){ const r=await api("requests"); if(r.ok){ S.reqs=r.requests; render(); } }
+function viewPeople(){
+  const u=S.users, q=S.reqs||[], pend=q.filter(x=>x.status==="Pending"), den=q.filter(x=>x.status==="Denied");
+  const roles=(u&&u.roles)||["Admin","Editor","Super Viewer","DM Viewer","Store Viewer"];
+  const perm=[["See dashboards, calendar, scorecard","✓","✓","All","Their DM","1 store"],["Export Excel, Google Sheet, PDF","✓","✓","All","Their DM","1 store"],["Log adjustments","✓","✓","—","—","—"],
+    ["Apply matches and combined deposits","✓","✓","—","—","—"],["Close a day","✓","✓","—","—","—"],["Reopen a closed day","✓","—","—","—","—"],["Add people, change roles, settings","✓","—","—","—","—"]];
+  return `<div class="top"><div><div class="eyebrow">ADMIN</div><h1>People &amp; access</h1><p class="sub">Who can sign in and what they see. Unchecking Active locks someone out right away.</p></div><button class="btn primary" id="uadd">Add person</button></div>
+  ${pend.length?`<div><div class="group-h"><h2>Waiting for approval</h2><span>${pend.length}</span></div><div class="tbl">${pend.map(x=>`<div class="req"><div class="st"><b>${esc(x.name)}</b><small>${esc(x.email)} · ${esc(x.title||"")}${x.at?` · ${new Date(x.at).toLocaleDateString("en-US",{month:"numeric",day:"numeric"})}`:""}</small>
+      <p style="margin:6px 0 0;font-size:13px">Wants: <span style="font-weight:600">${esc(x.wants||"—")}</span> · ${esc(x.reason)}</p></div>
+      <div class="req-a"><select data-rrole="${esc(x.email)}">${roles.map(r=>`<option ${r==="Store Viewer"?"selected":""}>${r}</option>`).join("")}</select><input data-rscope="${esc(x.email)}" placeholder="Scope: DM name or WZ #s (blank = auto)" value="">
+      <button class="btn primary" data-appr="${esc(x.email)}">Approve</button><button class="btn" data-deny="${esc(x.email)}">Deny</button></div></div>`).join("")}</div></div>`:""}
+  <div><div class="group-h"><h2>People</h2><span>${u?u.users.length:""}</span></div>
+  <div class="tbl">${!u?`<div class="empty"><b>Loading…</b></div>`:u.users.map(x=>`<button class="tr" data-user="${esc(x.email)}" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 90px">
+    <span class="st"><b>${esc(x.name||x.email)}</b><small>${esc(x.email)}</small></span><span class="dm">${esc(x.role)}</span><span class="dm">${esc(x.scope||"auto")}</span>
+    <span class="cell-st"><span class="pill ${x.active?"p-ok":"p-none"}">${x.active?"Active":"Off"}</span></span></button>`).join("")}</div></div>
+  ${den.length?`<div><div class="group-h"><h2>Denied requests</h2><span>${den.length}</span></div><div class="tbl">${den.map(x=>`<div class="req"><div class="st"><b>${esc(x.name)}</b><small>${esc(x.email)} · denied by ${esc(x.by)}</small></div><div class="req-a"><button class="btn" data-reopen="${esc(x.email)}">Move back to pending</button></div></div>`).join("")}</div></div>`:""}
+  <div><div class="group-h"><h2>What each role can do</h2></div><div class="tbl perm"><div class="pr ph"><span>Permission</span><span>Admin</span><span>Editor</span><span>Super</span><span>DM</span><span>Store</span></div>
+    ${perm.map(r=>`<div class="pr"><span>${r[0]}</span>${r.slice(1).map(v=>`<span class="${v==="—"?"no":v==="✓"?"yes":"part"}">${v}</span>`).join("")}</div>`).join("")}</div></div>
+  <div><div class="group-h"><h2>Settings</h2></div><form class="form" id="setf" style="max-width:520px"><div class="row2" style="grid-template-columns:1fr 1fr">
+    <label>Variance tolerance ($)<input id="st-t" inputmode="decimal" value="${S.boot.tolerance}"></label><label>Safe limit ($)<input id="st-l" inputmode="numeric" value="${S.boot.safeLimit}"></label></div>
+    <p class="fine" style="margin:0">Differences within the tolerance show as "Coins". New values apply from the next engine run (and when you re-run a day).</p><p class="err" id="st-err"></p><button class="btn primary" type="submit">Save settings</button></form></div>`;
+}
+function bindPeople(){
+  const m=$("main");
+  m.querySelectorAll("[data-appr]").forEach(b=>b.onclick=async()=>{ const e=b.dataset.appr; b.disabled=true;
+    const r=await api("decide",{email:e,approve:true,role:m.querySelector(`[data-rrole="${e}"]`).value,scope:m.querySelector(`[data-rscope="${e}"]`).value});
+    if(!r.ok){ toast(errText(r)); b.disabled=false; return; } S.reqs=r.requests; S.users=null; loadUsers(); toast("Approved — they've been emailed"); });
+  m.querySelectorAll("[data-deny]").forEach(b=>b.onclick=async()=>{ const r=await api("decide",{email:b.dataset.deny,approve:false}); if(r.ok){ S.reqs=r.requests; render(); toast("Denied"); } });
+  m.querySelectorAll("[data-reopen]").forEach(b=>b.onclick=async()=>{ const r=await api("decide",{email:b.dataset.reopen}); if(r.ok){ S.reqs=r.requests; render(); } });
+  const sf=$("setf"); if(sf) sf.onsubmit=async ev=>{ ev.preventDefault(); const r=await api("settings",{tolerance:$("st-t").value,safeLimit:$("st-l").value});
+    if(!r.ok){ $("st-err").textContent=errText(r); return; } S.boot.tolerance=r.tolerance; S.boot.safeLimit=r.safeLimit; S.safe=null; toast("Settings saved"); render(); };
+}
+
+/* ---------- Request access (sign-in page) ---------- */
+function renderRequest(){
+  $("root").innerHTML=`<div class="login"><form class="login-card" id="rf"><span class="nyc-logo" role="img" aria-label="NY Connection"></span>
+    <div><h1>Request access</h1><p class="fine" style="margin-top:4px">An admin reviews every request. You'll get an email when you're approved.</p></div>
+    <div class="field"><label for="r-n">Full name</label><input id="r-n" required autocomplete="name"></div>
+    <div class="field"><label for="r-e">Work email</label><input id="r-e" type="email" required autocomplete="email" placeholder="name@wireless-zone.com"></div>
+    <div class="field"><label for="r-t">Title</label><input id="r-t" placeholder="Store Manager, DM, Auditor…"></div>
+    <div class="field"><label for="r-w">What do you need to see?</label><input id="r-w" placeholder="My store (Copiague), my district, all stores"></div>
+    <div class="field"><label for="r-r">Why?</label><input id="r-r" required placeholder="Check my store's deposits each morning"></div>
+    <button class="btn primary" type="submit">Send request</button><button class="btn" type="button" id="r-back">Back to sign in</button><p class="err" id="r-err" role="alert"></p></form></div>`;
+  $("r-back").onclick=()=>renderLogin();
+  $("rf").onsubmit=async ev=>{ ev.preventDefault(); const btn=$("rf").querySelector(".btn.primary"); btn.disabled=true;
+    const r=await api("requestAccess",{name:$("r-n").value,email:$("r-e").value,title:$("r-t").value,wants:$("r-w").value,reason:$("r-r").value}); btn.disabled=false;
+    if(!r.ok){ $("r-err").textContent=r.error==="domain"?"Use your @wireless-zone.com email.":r.error==="missing_fields"?"Add your name and a reason.":errText(r); return; }
+    const msg={pending:"Request sent. You'll get an email once an admin approves it.",has_access:"This email already has access. Sign in instead.",denied:"This request wasn't approved. Contact Jonathan if you think that's a mistake."}[r.status];
+    renderLogin(null,msg); };
 }
 
 /* ---------- bindings ---------- */
@@ -562,6 +898,20 @@ function bindView(){
   m.querySelectorAll("[data-store]").forEach(x=>x.onclick=()=>storeSheet(x.dataset.store));
   m.querySelectorAll("[data-user]").forEach(x=>x.onclick=()=>userSheet(S.users.users.find(u=>u.email===x.dataset.user)));
   const ua=$("uadd"); if(ua) ua.onclick=()=>userSheet(null);
+  const lk=$("lockday"); if(lk) lk.onclick=()=>setLock(true);
+  const ul=$("unlock"); if(ul) ul.onclick=()=>setLock(false);
+  m.querySelectorAll("[data-safe]").forEach(x=>x.onclick=()=>safeSheet(x.dataset.safe));
+  m.querySelectorAll("[data-sby]").forEach(x=>x.onclick=()=>{ S.scoreBy=x.dataset.sby; render(); });
+  m.querySelectorAll("[data-sn]").forEach(x=>x.onclick=()=>{ S.scoreN=Number(x.dataset.sn); S.scoreData=null; render(); loadScore(); });
+  m.querySelectorAll("[data-cal]").forEach(x=>x.onclick=()=>{ S.calWz=x.dataset.cal; S.calData=S.calData; go("cal"); if(!S.calData) loadCal(); });
+  m.querySelectorAll("[data-dmf]").forEach(x=>x.onclick=()=>{ S.dm=x.dataset.dmf; S.filter="all"; go("day"); });
+  const cw=$("calwz"); if(cw) cw.onchange=()=>{ S.calWz=cw.value; render(); };
+  m.querySelectorAll("[data-calm]").forEach(x=>x.onclick=()=>{ S.calMonth=x.dataset.calm; S.calData=null; render(); loadCal(); });
+  const xf=$("xf"); if(xf){ xf.onsubmit=ev=>{ ev.preventDefault(); runExport(); };
+    xf.querySelectorAll("[data-xfmt]").forEach(b=>b.onclick=()=>{ readExp(); S.exp.fmt=b.dataset.xfmt; render(); });
+    xf.querySelectorAll("[data-xr]").forEach(b=>b.onclick=()=>{ readExp(); const last=S.boot.days[0]?S.boot.days[0].date:ymd(new Date()); S.exp.to=last;
+      S.exp.from=b.dataset.xr==="mtd"?last.slice(0,8)+"01":addD(last,-Number(b.dataset.xr)); render(); }); }
+  if(S.view==="team") bindPeople();
   if(S.view==="stores"&&S.boot.days[0]&&!S.days[S.boot.days[0].date]) loadDay(S.boot.days[0].date).then(()=>{ S.view="stores"; render(); });
 }
 
