@@ -32,5 +32,5 @@ Adjustments write to Daily_Log (*Manual Adj $, Adj Reason, Adj By, Note*). The e
 
 ## Updating
 
-- **Page:** edit `index.src.html`, rebuild `index.html` (it inlines the logo), and push. Pages updates in about a minute.
+- **Page:** edit `index.src.html`, run `python3 build.py` (it inlines the logo into `index.html`), and push. Pages updates in about a minute.
 - **API / engine:** paste into Apps Script, then **Deploy → Manage deployments → Edit → Version: New version → Deploy**. The URL stays the same.
