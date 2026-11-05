@@ -209,14 +209,16 @@ function ingestBrinks(query) {
       if (props.getProperty('br_' + msg.getId())) return;
       var reportDate = Utilities.formatDate(msg.getDate(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
       var count = 0;
-      msg.getAttachments().forEach(function (att) {
-        if (!/\.xlsx?$/i.test(att.getName())) return;
-        outFolder.createFile(att.copyBlob()).setName('Brinks_Deposit_Report_' + reportDate + '.xlsx');
-        var rows = xlsxToValues_(att.copyBlob(), att.getName());
-        var parsed = parseBrinksRows(rows, reportDate, msg.getId());
-        upsertBrinks_(parsed);
-        count += parsed.length;
-      });
+      try {
+        msg.getAttachments().forEach(function (att) {
+          if (!/\.xlsx?$/i.test(att.getName())) return;
+          var rows = xlsxToValues_(att.copyBlob(), att.getName());
+          var parsed = parseBrinksRows(rows, reportDate, msg.getId());
+          outFolder.createFile(att.copyBlob()).setName('Brinks_Deposit_Report_' + reportDate + '.xlsx');
+          upsertBrinks_(parsed);
+          count += parsed.length;
+        });
+      } catch (e) { logRun('Brinks email ' + reportDate + ' skipped: ' + e.message); return; }
       props.setProperty('br_' + msg.getId(), reportDate);
       addBrinksReportDate_(reportDate);
       t.addLabel(label);
@@ -231,16 +233,23 @@ function parseBrinksRows(rows, reportDate, msgId) {
   for (var r = 0; r < Math.min(rows.length, 30); r++) if (rows[r].map(String).indexOf('Business Day') >= 0) { hr = r; break; }
   if (hr < 0) throw new Error('Brinks header row not found');
   var h = rows[hr].map(function (x) { return String(x).trim(); });
-  var c = function (name) { var i = h.indexOf(name); if (i < 0) throw new Error('Brinks column missing: ' + name); return i; };
-  var iBD = c('Business Day'), iCA = c('Created At'), iSID = c('Store ID'), iLN = c('Location Name'), iBC = c('Deposit Barcode'),
-      iBy = c('Created By'), iSt = c('Status'), iDec = c('Declared'), iVer = c('Verified'), iVar = c('Variance'),
-      iCom = c('Comments'), iRec = c('Bag Received Date');
+  var c = function (name, re, optional) {
+    var i = h.indexOf(name);
+    if (i < 0 && re) for (var k = 0; k < h.length; k++) if (re.test(h[k])) { i = k; break; }
+    if (i < 0 && !optional) throw new Error('Brinks column missing: ' + name + ' (headers: ' + h.filter(String).join(', ') + ')');
+    return i;
+  };
+  var iBD = c('Business Day', /business/i), iCA = c('Created At', /created (at|on|date)|date created/i), iSID = c('Store ID', /store ?id|store ?#/i),
+      iLN = c('Location Name', /location/i), iBC = c('Deposit Barcode', /barcode|^bag/i), iBy = c('Created By', /created by|user/i, true),
+      iSt = c('Status', /status/i, true), iDec = c('Declared', /declared/i), iVer = c('Verified', /verified/i, true), iVar = c('Variance', /variance/i, true),
+      iCom = c('Comments', /comment/i, true), iRec = c('Bag Received Date', /received/i, true);
+  var g = function (x, i) { return i < 0 ? '' : x[i]; };
   var out = [];
   for (var r2 = hr + 1; r2 < rows.length; r2++) {
     var x = rows[r2];
     if (!x[iBC]) continue;
-    out.push([String(x[iBC]).trim(), x[iBD], x[iCA], String(x[iSID]).trim(), String(x[iLN]).trim(), x[iBy], String(x[iSt]).trim(),
-      num_(x[iDec]), x[iVer] === '' ? '' : num_(x[iVer]), x[iVar] === '' ? '' : num_(x[iVar]), x[iCom] || '', x[iRec] || '',
+    out.push([String(x[iBC]).trim(), x[iBD], x[iCA], String(x[iSID]).trim(), String(x[iLN]).trim(), g(x, iBy), String(g(x, iSt) || 'ACH').trim(),
+      num_(x[iDec]), g(x, iVer) === '' ? '' : num_(x[iVer]), g(x, iVar) === '' ? '' : num_(x[iVar]), g(x, iCom) || '', g(x, iRec) || '',
       '', '', '', reportDate, msgId]);
   }
   return out;
