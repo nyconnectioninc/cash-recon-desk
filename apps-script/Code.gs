@@ -720,12 +720,15 @@ function ingestBrinksImports_() {
   var tz = Session.getScriptTimeZone();
   while (files.hasNext()) {
     var f = files.next();
-    if (!/\.xlsx?$/i.test(f.getName())) continue;
+    var gs = f.getMimeType() === MimeType.GOOGLE_SHEETS;
+    if (!gs && !/\.xlsx?$/i.test(f.getName())) continue;
     var key = 'bi_' + f.getId() + '_' + f.getLastUpdated().getTime();
     if (props.getProperty(key)) continue;
     try {
-      var rd = Utilities.formatDate(f.getDateCreated(), tz, 'yyyy-MM-dd');
-      var parsed = parseBrinksRows(xlsxToValues_(f.getBlob(), f.getName()), rd, 'import:' + f.getName());
+      var rd = Utilities.formatDate(f.getDateCreated(), tz, 'yyyy-MM-dd'), vals;
+      if (gs) { var s2 = SpreadsheetApp.openById(f.getId()); s2.setSpreadsheetTimeZone(tz); vals = s2.getSheets()[0].getDataRange().getValues(); }
+      else vals = xlsxToValues_(f.getBlob(), f.getName());
+      var parsed = parseBrinksRows(vals, rd, 'import:' + f.getName());
       upsertBrinks_(parsed);
       activateNewInstalls_(parsed);
       props.setProperty(key, '1');
