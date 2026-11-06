@@ -161,6 +161,8 @@ h3{font-size:15px;margin:0;font-weight:650}
 .btn.primary{background:var(--accent);color:#fff}
 .btn[disabled]{opacity:.45;cursor:default}
 .err{color:var(--red);font-size:13px;min-height:1em}
+.upd{position:fixed;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:var(--surface);color:var(--muted);border:1px solid var(--sep);box-shadow:var(--shadow);padding:5px 12px;border-radius:999px;font-size:12px;font-weight:600;z-index:55;opacity:0;transition:opacity .2s;pointer-events:none}
+.upd.on{opacity:1}
 .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;transition:.2s;z-index:60;pointer-events:none}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
@@ -259,6 +261,7 @@ h3{font-size:15px;margin:0;font-weight:650}
 <div class="scrim" id="scrim"></div>
 <aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t"></aside>
 <div class="toast" id="toast" role="status"></div>
+<div class="upd" id="upd" aria-live="polite">Updating…</div>
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbxam-F_3keAk2SmdAxlfKPFAqY-6LLxfGVT_yR3nqXU0IpoSP5UsMVOhexhN2cwZq8Tcg/exec";
 const TOKEN_KEY = "crd.session";
@@ -295,7 +298,7 @@ const IC = {
   search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>'
 };
 
-const S = { token:null, me:null, boot:null, days:{}, view:"day", date:null, filter:"open", q:"", dm:"", co:"", sel:null, store:null, users:null, loading:false, err:null };
+const S = { token:null, me:null, boot:null, days:{}, staleDays:{}, view:"day", date:null, filter:"open", q:"", dm:"", co:"", sel:null, store:null, users:null, loading:false, err:null };
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money = (n,sign) => { n=Number(n)||0; const s=Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); return (n<0?"−$":(sign&&n>0?"+$":"$"))+s; };
@@ -332,7 +335,7 @@ const errText = r => ({not_configured:"The dashboard isn't connected to its back
 /* ---------- session ---------- */
 function loadSession(){ try{ const x=JSON.parse(localStorage.getItem(TOKEN_KEY)||"null"); if(x&&x.token&&x.expires>Date.now()){ S.token=x.token; S.me=x.me; } }catch(e){} }
 function saveSession(x){ try{ localStorage.setItem(TOKEN_KEY,JSON.stringify(x)); }catch(e){} }
-function signOut(msg){ try{ localStorage.removeItem(TOKEN_KEY); }catch(e){} Object.assign(S,{token:null,me:null,boot:null,days:{},users:null}); closeSheet(); renderLogin(null,msg); }
+function signOut(msg){ try{ localStorage.removeItem(TOKEN_KEY); }catch(e){} clearCache(); Object.assign(S,{token:null,me:null,boot:null,days:{},staleDays:{},safe:null,users:null}); closeSheet(); renderLogin(null,msg); }
 
 function renderLogin(email,msg){
   $("root").innerHTML=`<div class="login"><form class="login-card" id="lf" data-email="${esc(email||"")}">
@@ -366,15 +369,58 @@ function renderLogin(email,msg){
 }
 
 /* ---------- data ---------- */
+/* Last results are kept on this device (per signed-in user) so the page opens instantly; fresh data replaces them in the background. */
+const CACHE_KEY = () => "crd.cache." + ((S.me&&S.me.email)||"");
+function readCache(){ try{ const c=JSON.parse(localStorage.getItem(CACHE_KEY())||"null"); return c&&c.v===1?c:null; }catch(e){ return null; } }
+function writeCache(){
+  try{ if(!S.boot||!S.me) return;
+    const keep=(S.boot.days||[]).slice(0,3).map(d=>d.date).concat(S.date?[S.date]:[]), days={};
+    keep.forEach(d=>{ if(S.days[d]&&!S.staleDays[d]) days[d]=S.days[d]; });
+    localStorage.setItem(CACHE_KEY(),JSON.stringify({v:1,t:Date.now(),boot:S.boot,days,safe:S.safe||null}));
+  }catch(e){ try{ localStorage.removeItem(CACHE_KEY()); }catch(_){} }
+}
+function clearCache(){ try{ Object.keys(localStorage).filter(k=>k.indexOf("crd.cache.")===0).forEach(k=>localStorage.removeItem(k)); }catch(e){} }
+let updN=0;
+function updating(on){ updN=Math.max(0,updN+(on?1:-1)); const u=$("upd"); if(u) u.classList.toggle("on",updN>0); }
+/* Background refreshes don't redraw while someone is typing in a box. */
+function softRender(){ const a=document.activeElement; if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&$("main")&&$("main").contains(a)) return; render(); }
+function ymdLocal(t){ const d=new Date(t); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
 async function start(){
-  renderShell(); $("main").innerHTML=`<div class="wrap"><div class="empty"><b>Loading…</b>Pulling the latest recon.</div></div>`;
-  const r=await api("bootstrap"); if(!r.ok){ if(S.token) $("main").innerHTML=`<div class="wrap"><div class="empty"><b>Couldn't load</b>${esc(errText(r))}</div></div>`; return; }
+  const c=readCache();
+  renderShell();
+  if(c&&c.boot){
+    S.boot=c.boot; S.days=Object.assign({},c.days||{}); S.staleDays={}; Object.keys(S.days).forEach(d=>S.staleDays[d]=1);
+    if(c.safe){ S.safe=c.safe; S.safeStale=true; }
+    if(!S.date||!c.boot.days.some(d=>d.date===S.date)) S.date=c.boot.days[0]&&c.boot.days[0].date;
+    render();
+  } else $("main").innerHTML=`<div class="wrap"><div class="empty"><b>Loading…</b>Pulling the latest recon.</div></div>`;
+  updating(true);
+  const guess=S.date||ymdLocal(Date.now()-864e5);
+  const pB=api("bootstrap"), pD=api("day",{date:guess});            // both at once, not one after the other
+  const r=await pB;
+  if(!r.ok){ updating(false); if(S.token){ if(c&&c.boot) toast(errText(r)); else $("main").innerHTML=`<div class="wrap"><div class="empty"><b>Couldn't load</b>${esc(errText(r))}</div></div>`; } return; }
   S.boot=r; S.me=r.me; if(!S.date || !r.days.some(d=>d.date===S.date)) S.date=r.days[0]&&r.days[0].date;
-  render(); if(S.date) loadDay(S.date);
+  if(S.date===guess){ const d=await pD; if(d.ok){ S.days[guess]=d; delete S.staleDays[guess]; } }
+  else if(S.date){ const d=await api("day",{date:S.date}); if(d.ok){ S.days[S.date]=d; delete S.staleDays[S.date]; } }
+  updating(false); softRender(); writeCache();
+  prefetch();
+}
+/* Quietly load what the next taps usually need: the day before and the Safe tracker. */
+function prefetch(){
+  const prev=(S.boot.days||[]).map(d=>d.date).filter(d=>d!==S.date)[0];
+  if(prev&&(!S.days[prev]||S.staleDays[prev])) api("day",{date:prev}).then(r=>{ if(r.ok){ S.days[prev]=r; delete S.staleDays[prev]; writeCache(); if(S.view==="day"&&S.date===prev) softRender(); } });
+  if(!S.safe||S.safeStale) api("safe").then(r=>{ if(r.ok){ S.safe=r; S.safeStale=false; writeCache(); if(S.view==="safe") softRender(); } });
 }
 async function loadDay(d,force){
   if(!d) return; S.date=d;
-  if(!S.days[d]||force){ if(!S.days[d]) render(); const r=await api("day",{date:d}); if(!r.ok){ S.err=errText(r); render(); return; } S.days[d]=r; }
+  const stale=!!S.staleDays[d];
+  if(!S.days[d]||force||stale){
+    if(!S.days[d]) render(); else if(stale) render();
+    updating(true); const r=await api("day",{date:d}); updating(false);
+    if(!r.ok){ if(!S.days[d]){ S.err=errText(r); render(); } return; }
+    S.days[d]=r; delete S.staleDays[d]; writeCache(); if(stale){ softRender(); return; }
+  }
   render();
 }
 
@@ -594,7 +640,7 @@ async function rowSheet(date,wz){
       const res=await api("saveAdj",{date,wz,adj,reason:$("a-rsn").value,note:$("a-note").value}); btn.disabled=false;
       if(!res.ok){ $("a-err").textContent=errText(res); return; }
       const d=S.days[date]; if(d){ const k=d.rows.findIndex(x=>x.wz===wz); if(k>=0) d.rows[k]=res.row; }
-      toast("Saved"); dropCaches(); const b=await api("bootstrap"); if(b.ok) S.boot=b; render(); rowSheet(date,wz); };
+      toast("Saved"); dropCaches(); const b=await api("bootstrap"); if(b.ok) S.boot=b; writeCache(); render(); rowSheet(date,wz); };
   }
   const hr=await histInto(wz,date); const ab=$("alloc-box");
   if(ab&&hr&&hr.ok&&S.sel&&S.sel.wz===wz&&S.sel.date===date){ ab.innerHTML=allocHtml(r,hr.rows,hr.allocs); bindAlloc(r); }
@@ -698,7 +744,7 @@ async function afterEdit(r,msg){
 }
 
 /* ---------- Safe Tracker ---------- */
-async function loadSafe(force){ if(S.safe&&!force) return; const r=await api("safe"); if(r.ok){ S.safe=r; render(); } else toast(errText(r)); }
+async function loadSafe(force){ if(S.safe&&!force&&!S.safeStale) return; if(S.safe) updating(true); const r=await api("safe"); if(S.safe) updating(false); if(r.ok){ S.safe=r; S.safeStale=false; writeCache(); render(); } else toast(errText(r)); }
 function viewSafe(){
   const s=S.safe; if(!s) return `<div class="top"><div><div class="eyebrow">SAFES</div><h1>Safe tracker</h1></div></div><div class="tbl"><div class="empty"><b>Loading…</b></div></div>`;
   const nm=x=>x.stores.map(t=>t.name).join(" + "), ago=t=>{ const d=Math.floor((Date.now()-t)/864e5); return d<=0?"today":d===1?"1 day ago":d+" days ago"; };
