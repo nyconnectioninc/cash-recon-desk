@@ -90,6 +90,10 @@ h3{font-size:15px;margin:0;font-weight:650}
 .trend{display:flex;flex-direction:column;gap:8px}
 .trend-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
 .trend svg{width:100%;height:84px;display:block;overflow:visible}
+.tcall{display:inline-flex;align-items:center;gap:6px;background:var(--fg);color:var(--bg);font-size:12px;font-weight:600;padding:4px 10px;border-radius:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tcall-d{opacity:.65;font-weight:500}
+.tsub{color:var(--muted);font-weight:500}
+@media (max-width:860px){.tcall-d,.tsub{display:none}}
 .trend .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
 .trend .legend span{display:inline-flex;align-items:center;gap:5px}
 
@@ -534,10 +538,12 @@ function trendSvg(days){
   const W=600,H=96,gap=4,bw=(W-gap*(d.length-1))/d.length, mx=Math.max(1,...d.map(x=>x.open));
   const keys=[["missing","var(--red)"],["short","var(--orange)"],["over","var(--purple)"],["brinksOnly","var(--teal)"]];
   let bars="";
+  const hasSel=d.some(x=>x.date===S.date);
   d.forEach((x,i)=>{ let y=H-14; const xx=i*(bw+gap);
+    bars+=`<g opacity="${hasSel&&x.date!==S.date?.32:1}">`;
     keys.forEach(([k,c])=>{ const h=x[k]/mx*(H-22); if(h>0){ bars+=`<rect x="${xx.toFixed(1)}" y="${(y-h).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(h-1,1).toFixed(1)}" rx="2" fill="${c}"><title>${dayLabel(x.date)}: ${x.open} open · ${money(x.openAmt)}</title></rect>`; y-=h; } });
     if(!x.open) bars+=`<rect x="${xx.toFixed(1)}" y="${H-16}" width="${bw.toFixed(1)}" height="2" rx="1" fill="var(--green)"/>`;
-    if(x.date===S.date) bars+=`<rect x="${(xx-1).toFixed(1)}" y="0" width="${(bw+2).toFixed(1)}" height="${H-12}" rx="3" fill="none" stroke="var(--accent)" stroke-width="1.5"/>`;
+    bars+=`</g>`;
     bars+=`<rect x="${xx.toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${H}" fill="transparent" data-tday="${x.date}" style="cursor:pointer"/>`;
   });
   return `<svg viewBox="0 0 ${W} ${H-12}" preserveAspectRatio="none" role="img" aria-label="Open items per day">${bars}</svg>
@@ -565,9 +571,10 @@ function viewDay(){
     ${tile("over","Over",sum.over,data?money(amt("OVER")):"","var(--purple)")}
     ${tile("bonly","Bag, no cashout",sum.brinksOnly,data?money(amt("BRINKS ONLY")):"","var(--teal)")}
   </div>
-  <div class="card trend"><div class="trend-h"><h3>Open items, last ${Math.min(21,b.days.length)} days</h3>
+  <div class="card trend"><div class="trend-h" style="align-items:center;flex-wrap:nowrap"><h3 style="min-width:0">Open items<span class="tsub"> · last ${Math.min(21,b.days.length)} days</span></h3>
+    <span class="tcall"><span class="tcall-d">${dayLabel(S.date)}</span>${sum.open?`${sum.open} open · $${Math.round(sum.openAmt).toLocaleString("en-US")}`:"All matched"}</span></div>
+    ${trendSvg(b.days)}
     <div class="legend"><span><i class="sw" style="background:var(--red)"></i>Missing</span><span><i class="sw" style="background:var(--orange)"></i>Short</span><span><i class="sw" style="background:var(--purple)"></i>Over</span><span><i class="sw" style="background:var(--teal)"></i>Bag, no cashout</span></div></div>
-    ${trendSvg(b.days)}</div>
   <div class="toolbar">
     <div class="seg" role="group" aria-label="Filter">${FILTERS.map(([k,l])=>`<button data-f="${k}" aria-pressed="${S.filter===k}">${l}</button>`).join("")}</div>
     <label class="search">${IC.search}<input id="q" placeholder="Store, WZ #, DM, note" value="${esc(S.q)}" aria-label="Search"></label>
