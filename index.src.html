@@ -163,8 +163,8 @@ h3{font-size:15px;margin:0;font-weight:650}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
 /* Login */
-.login{min-height:100%;display:grid;place-items:center;padding:40px 16px}
-.login-card{width:min(380px,100%);background:var(--surface);border-radius:20px;padding:28px 24px;display:flex;flex-direction:column;gap:16px;box-shadow:var(--shadow)}
+.login{min-height:100%;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:40px 16px}
+.login-card{width:min(380px,100%);min-width:0;overflow-wrap:anywhere;background:var(--surface);border-radius:20px;padding:28px 24px;display:flex;flex-direction:column;gap:16px;box-shadow:var(--shadow)}
 .login-card .nyc-logo{width:150px}
 .login-card h1{font-size:26px}
 .field{display:flex;flex-direction:column;gap:6px}
