@@ -726,7 +726,7 @@ function ingestBrinksImports_() {
     if (props.getProperty(key)) continue;
     try {
       var rd = Utilities.formatDate(f.getDateCreated(), tz, 'yyyy-MM-dd'), vals;
-      if (gs) { var s2 = SpreadsheetApp.openById(f.getId()); s2.setSpreadsheetTimeZone(tz); vals = s2.getSheets()[0].getDataRange().getValues(); }
+      if (gs) { var s2 = SpreadsheetApp.openById(f.getId()); if (s2.getSpreadsheetTimeZone() !== tz) s2.setSpreadsheetTimeZone(tz); vals = s2.getSheets()[0].getDataRange().getValues(); }
       else vals = xlsxToValues_(f.getBlob(), f.getName());
       var parsed = parseBrinksRows(vals, rd, 'import:' + f.getName());
       upsertBrinks_(parsed);
