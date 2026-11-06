@@ -4,9 +4,18 @@ The dashboard for the daily **RQ cashout vs. Brinks deposit** recon.
 
 - **Frontend:** `index.html`, served by GitHub Pages. It holds no data. Everything loads from the API after sign-in.
 - **Backend:** the **Brinks Cash Recon Engine** Apps Script project (owner `jonsanchez0009@gmail.com`).
-  - `apps-script/Code.gs`: the engine. It runs every 15 min from 6:00 to 11:59 AM, ingests the RQ file and the Brinks email, reconciles, nets late drops and sends the alert.
+  - `apps-script/Code.gs`: the engine. It runs every 15 min from 6:00 to 11:59 AM, ingests the RQ file and the Brinks emails (**Device Activity**: every safe type, plus the Deposit Report for comments/variance), reconciles, nets late drops and sends the alert.
   - `apps-script/Api.gs` + `apps-script/Api2.gs` (*Features.gs* in the project): the dashboard API (web app). Deployed as **Execute as Me · Anyone**. Every call except sign-in needs a signed 30-day session for an Active user on the **Users** tab.
 - **Data:** Google Sheet *Brinks Deposit Recon – Control Sheet* (tabs: Store Map, Daily_Log, RQ_Raw, Brinks_Raw, Config, Users, Desk_Activity, Deposit_Allocations, Day_Locks, Access_Requests, Run_Log).
+
+## Brinks data
+
+- **Device Activity report** (main source): bag drops *and* smart-safe (bill feeder) deposits, with the Brinks **Location #** on every row. Location # = Store Map **Brinks ID**, so stores that share a Brinks Store ID (Berlin, Broadway, 8th Ave) are told apart exactly.
+- **Deposit Report** (kept running): adds comments, verified $ and variance to the same bags (merged by barcode).
+- Smart-safe deposits have no barcode; they're keyed `SD-<Location #>-<time>-<amount>`. $1 install tests are ignored.
+- **New installs:** the first deposit under a `WZ####` Store ID fills that store's Brinks ID on the Store Map, sets it Active and emails the admin.
+- **Manual exports:** drop a Device Activity / Deposit Report export (xlsx or Google Sheet) in Drive › Brinks Recon › Brinks Imports. It loads on the next run. `brinksCatchUp()` loads it now and re-runs the last 7 days.
+- Config: `DEVICE_QUERY` (Gmail search for the Device Activity email), `BRINKS_QUERY`, `BRINKS_IMPORT_PATH`.
 
 ## Roles (Users tab)
 
