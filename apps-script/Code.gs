@@ -243,7 +243,7 @@ function ingestBrinks(query) {
 /** Pure: Brinks Deposit Report rows -> Brinks_Raw rows (assignment columns blank). */
 function parseBrinksRows(rows, reportDate, msgId) {
   var hr = -1;
-  for (var r = 0; r < Math.min(rows.length, 30); r++) if (rows[r].map(String).indexOf('Business Day') >= 0) { hr = r; break; }
+  for (var r = 0; r < Math.min(rows.length, 30); r++) if (rows[r].map(function (v) { return String(v).trim(); }).indexOf('Business Day') >= 0) { hr = r; break; }
   if (hr < 0) throw new Error('Brinks header row not found');
   var h = rows[hr].map(function (x) { return String(x).trim(); });
   var c = function (name, re, optional) {
@@ -258,15 +258,17 @@ function parseBrinksRows(rows, reportDate, msgId) {
       iCom = c('Comments', /comment/i, true), iRec = c('Bag Received Date', /received/i, true),
       iLoc = c('Location Number', /location (number|no|#)/i, true), iTyp = c('Deposit Type', /deposit type/i, true);
   var g = function (x, i) { return i < 0 ? '' : x[i]; };
-  var out = [];
+  var out = [], lastBD = '';
   for (var r2 = hr + 1; r2 < rows.length; r2++) {
     var x = rows[r2];
+    if (x[iBD] !== '' && x[iBD] != null) lastBD = x[iBD];      // Device Activity email lists Business Day once per group
     if (!x[iBC] || !x[iCA]) continue;
+    x = x.slice(); x[iBD] = lastBD;
     var code = String(x[iBC]).trim(), type = String(g(x, iTyp) || '').trim(), loc = String(g(x, iLoc) || '').trim(), by = g(x, iBy),
         st = String(g(x, iSt) || 'ACH').trim(), amt = num_(x[iDec]);
     if (/safedeposit/i.test(type) || /\s/.test(code)) {          // smart safe (bill feeder): no bag barcode, "Created By" is the device #
       var t = x[iCA] instanceof Date ? x[iCA].getTime() : new Date(x[iCA]).getTime();
-      code = 'SD-' + (loc || String(x[iSID]).trim()) + '-' + Math.round(t / 1000) + '-' + amt;
+      code = 'SD-' + (loc || String(x[iSID]).trim()) + '-' + Math.floor(t / 1000) + '-' + amt;
       type = 'SafeDeposit (device ' + by + ')'; by = '';
       if (amt <= 1) st = 'Test';                                  // $1 install test deposits
     }
