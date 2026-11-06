@@ -361,8 +361,8 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
       if (hit.date !== bagDate_(o.b, opt).date) notes.push('late drop (cashout ' + hit.date + ')');
       empMatch[o.b[0]] = { date: hit.date, wz: hit.wz, note: notes.join('; ') };
     });
-  // 1c. Shared Brinks ID, no employee match: exact amount (\u00b1$1) vs an unmatched cashout at one of the sharing stores
-  brRows.filter(function (b) { return b[0] && !empMatch[b[0]] && !brSkip_(b) && brCands_(b, map).length > 1; })
+  // 1c. No employee match: exact amount (\u00b1$1) vs an unmatched cashout at the bag's store(s) in the prior 14 days (catches late drops)
+  brRows.filter(function (b) { return b[0] && !empMatch[b[0]] && !brSkip_(b) && Number(b[7]) > 0 && brCands_(b, map).length >= 1; })
     .map(function (b) { return { b: b, t: b[2] instanceof Date ? b[2] : new Date(b[2]) }; })
     .sort(function (x, y) { return x.t - y.t; })
     .forEach(function (o) {
@@ -371,7 +371,7 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
         .sort(function (x, y) { return x.date < y.date ? 1 : x.date > y.date ? -1 : 0; })[0];
       if (!hit) return;
       usedTx[hit.tx] = 1;
-      var notes = ["Brinks ID '" + sid + "' shared \u2192 matched to " + hit.wz + ' cashout by amount'];
+      var notes = cands.length > 1 ? ["Brinks ID '" + sid + "' shared \u2192 matched to " + hit.wz + ' cashout by amount'] : [];
       if (hit.date !== bagDate_(o.b, opt).date) notes.push('late drop (cashout ' + hit.date + ')');
       empMatch[o.b[0]] = { date: hit.date, wz: hit.wz, note: notes.join('; ') };
     });
