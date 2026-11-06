@@ -362,7 +362,12 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
       empMatch[o.b[0]] = { date: hit.date, wz: hit.wz, note: notes.join('; ') };
     });
   // 1c. No employee match: exact amount (\u00b1$1) vs an unmatched cashout at the bag's store(s) in the prior 14 days (catches late drops)
-  brRows.filter(function (b) { return b[0] && !empMatch[b[0]] && !brSkip_(b) && Number(b[7]) > 0 && brCands_(b, map).length >= 1; })
+  var rqMax = outs.reduce(function (m, x) { return x.date > m ? x.date : m; }, '');
+  brRows.filter(function (b) {
+    if (!b[0] || empMatch[b[0]] || brSkip_(b) || !(Number(b[7]) > 0)) return false;
+    var n = brCands_(b, map).length;
+    return n > 1 || (n === 1 && bagDate_(b, opt).date <= rqMax);   // single store: only once that day's RQ is in, so its own cashout gets first claim
+  })
     .map(function (b) { return { b: b, t: b[2] instanceof Date ? b[2] : new Date(b[2]) }; })
     .sort(function (x, y) { return x.t - y.t; })
     .forEach(function (o) {
