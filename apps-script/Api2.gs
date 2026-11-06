@@ -206,8 +206,9 @@ function desk2Safe_(me) {
   readTab_(TABS.BR).forEach(function (b) {
     if (!b[0]) return;
     var t = b[2] instanceof Date ? b[2].getTime() : new Date(b[2]).getTime();
+    if (/^SD-/.test(String(b[0]))) return;   // smart-safe (bill feeder) deposits have no bag barcode to match to pickups
     cover = Math.min(cover, t); depositBags[String(b[0])] = 1;
-    if (String(b[6]).toUpperCase() === 'VOIDED') return;
+    if (/^(voided|test)$/i.test(String(b[6]).trim())) return;
     (bySid[String(b[3]).trim()] = bySid[String(b[3]).trim()] || []).push({ bag: String(b[0]), t: t, amt: Number(b[7]) || 0, by: String(b[5]), wz: String(b[13] || '') });
   });
   var rq = readTab_(TABS.RQ), rqFirst = rq.reduce(function (m, r) { var d = normDate_(r[0]); return !m || d < m ? d : m; }, '');

@@ -26,6 +26,8 @@ var DEFAULT_CFG = {
   RQ_FOLDER_PATH: 'Brinks Recon/RQ Cash Audit',
   BRINKS_FOLDER_PATH: 'Brinks Recon/Brinks Deposits',
   BRINKS_QUERY: 'from:no-reply@brinksinc.com subject:"Deposit Report" has:attachment newer_than:10d',
+  DEVICE_QUERY: 'from:no-reply@brinksinc.com subject:"Device Activity" has:attachment newer_than:10d',   // all safe types (bags + smart safes)
+  BRINKS_IMPORT_PATH: 'Brinks Recon/Brinks Imports',   // drop a manual Device Activity / Deposit Report export here
   RECHECK_DAYS: '3',                 // re-reconcile this many recent days each run (late bags)
   MISSING_FILE_ALERT_HOUR: '11'      // after this hour, email admin if inputs still missing
 };
@@ -35,7 +37,8 @@ var LOG_HEADERS = ['Date', 'WZ #', 'Store', 'Company', 'DM', 'RQ Deposit', 'Brin
 var MANUAL_COLS = [11, 12, 13, 14]; // 0-based: Manual Adj $, Adj Reason, Adj By, Note
 var RQ_HEADERS = ['Business Date', 'WZ #', 'Location', 'Transaction #', 'Created On', 'Employee', 'Deposit', 'Entered', 'Expected', 'Float', 'Source File'];
 var BR_HEADERS = ['Barcode', 'Business Day', 'Created At', 'Store ID', 'Location Name', 'Created By', 'Status', 'Declared',
-  'Verified', 'Variance', 'Comments', 'Bag Received', 'Assigned Date', 'Assigned WZ', 'Assign Note', 'Report Date', 'Source Msg'];
+  'Verified', 'Variance', 'Comments', 'Bag Received', 'Assigned Date', 'Assigned WZ', 'Assign Note', 'Report Date', 'Source Msg',
+  'Location #', 'Deposit Type'];
 
 // ───────────────────────── MENU / TRIGGERS ─────────────────────────
 function onOpen() {
@@ -200,6 +203,12 @@ function parseRQRows(rows, bizDate, fileName) {
 // ───────────────────────── INGEST: BRINKS ─────────────────────────
 function ingestBrinks(query) {
   var cfg = getCfg_();
+  if (!query) {
+    ingestBrinks(cfg.BRINKS_QUERY);
+    if (cfg.DEVICE_QUERY) ingestBrinks(cfg.DEVICE_QUERY);
+    ingestBrinksImports_();
+    return;
+  }
   var props = PropertiesService.getScriptProperties();
   var outFolder = folderByPath_(cfg.BRINKS_FOLDER_PATH, true);
   var label = gmailLabel_('Brinks/Processed');
@@ -214,8 +223,9 @@ function ingestBrinks(query) {
           if (!/\.xlsx?$/i.test(att.getName())) return;
           var rows = xlsxToValues_(att.copyBlob(), att.getName());
           var parsed = parseBrinksRows(rows, reportDate, msg.getId());
-          outFolder.createFile(att.copyBlob()).setName('Brinks_Deposit_Report_' + reportDate + '.xlsx');
+          outFolder.createFile(att.copyBlob()).setName('Brinks_' + att.getName().replace(/\.xlsx?$/i, '').replace(/\W+/g, '_') + '_' + reportDate + '.xlsx');
           upsertBrinks_(parsed);
+          activateNewInstalls_(parsed);
           count += parsed.length;
         });
       } catch (e) {
@@ -244,22 +254,32 @@ function parseBrinksRows(rows, reportDate, msgId) {
   };
   var iBD = c('Business Day', /business/i), iCA = c('Created At', /created (at|on|date)|date created/i), iSID = c('Store ID', /store ?id|store ?#/i),
       iLN = c('Location Name', /location/i), iBC = c('Deposit Barcode', /barcode|^bag/i), iBy = c('Created By', /created by|user/i, true),
-      iSt = c('Status', /status/i, true), iDec = c('Declared', /declared/i), iVer = c('Verified', /verified/i, true), iVar = c('Variance', /variance/i, true),
-      iCom = c('Comments', /comment/i, true), iRec = c('Bag Received Date', /received/i, true);
+      iSt = c('Status', /status/i, true), iDec = c('Declared', /declared|transaction total|deposit amount/i), iVer = c('Verified', /verified/i, true), iVar = c('Variance', /variance/i, true),
+      iCom = c('Comments', /comment/i, true), iRec = c('Bag Received Date', /received/i, true),
+      iLoc = c('Location Number', /location (number|no|#)/i, true), iTyp = c('Deposit Type', /deposit type/i, true);
   var g = function (x, i) { return i < 0 ? '' : x[i]; };
   var out = [];
   for (var r2 = hr + 1; r2 < rows.length; r2++) {
     var x = rows[r2];
-    if (!x[iBC]) continue;
-    out.push([String(x[iBC]).trim(), x[iBD], x[iCA], String(x[iSID]).trim(), String(x[iLN]).trim(), g(x, iBy), String(g(x, iSt) || 'ACH').trim(),
-      num_(x[iDec]), g(x, iVer) === '' ? '' : num_(x[iVer]), g(x, iVar) === '' ? '' : num_(x[iVar]), g(x, iCom) || '', g(x, iRec) || '',
-      '', '', '', reportDate, msgId]);
+    if (!x[iBC] || !x[iCA]) continue;
+    var code = String(x[iBC]).trim(), type = String(g(x, iTyp) || '').trim(), loc = String(g(x, iLoc) || '').trim(), by = g(x, iBy),
+        st = String(g(x, iSt) || 'ACH').trim(), amt = num_(x[iDec]);
+    if (/safedeposit/i.test(type) || /\s/.test(code)) {          // smart safe (bill feeder): no bag barcode, "Created By" is the device #
+      var t = x[iCA] instanceof Date ? x[iCA].getTime() : new Date(x[iCA]).getTime();
+      code = 'SD-' + (loc || String(x[iSID]).trim()) + '-' + Math.round(t / 1000) + '-' + amt;
+      type = 'SafeDeposit (device ' + by + ')'; by = '';
+      if (amt <= 1) st = 'Test';                                  // $1 install test deposits
+    }
+    out.push([code, x[iBD], x[iCA], String(x[iSID]).trim(), String(x[iLN]).trim(), by, st,
+      amt, g(x, iVer) === '' ? '' : num_(x[iVer]), g(x, iVar) === '' ? '' : num_(x[iVar]), g(x, iCom) || '', g(x, iRec) || '',
+      '', '', '', reportDate, msgId, loc, type]);
   }
   return out;
 }
 
 function upsertBrinks_(parsed) {
   var sh = sheet_(TABS.BR, BR_HEADERS);
+  if (sh.getLastColumn() < BR_HEADERS.length) sh.getRange(1, 1, 1, BR_HEADERS.length).setValues([BR_HEADERS]).setFontWeight('bold');
   var data = sh.getDataRange().getValues();
   var idx = {};
   for (var i = 1; i < data.length; i++) idx[data[i][0]] = i + 1;
@@ -267,8 +287,9 @@ function upsertBrinks_(parsed) {
   parsed.forEach(function (row) {
     if (idx[row[0]]) {
       var rn = idx[row[0]];
-      var keep = sh.getRange(rn, 13, 1, 3).getValues()[0];        // keep assignment columns
-      row[12] = keep[0]; row[13] = keep[1]; row[14] = keep[2];
+      var old = sh.getRange(rn, 1, 1, BR_HEADERS.length).getValues()[0];
+      row[12] = old[12]; row[13] = old[13]; row[14] = old[14];     // keep assignment columns
+      [5, 8, 9, 10, 11, 17, 18].forEach(function (k) { if (row[k] === '' || row[k] == null) row[k] = old[k]; });   // one report fills what the other lacks
       sh.getRange(rn, 1, 1, row.length).setValues([row]);         // status/verified may change
     } else appends.push(row);
   });
@@ -325,7 +346,7 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
   var nm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z]/g, ''); };
   var outs = rqRows.filter(function (r) { return r[1] && r[5] && Number(r[6]) > 0 && map.byWZ[String(r[1])]; })
     .map(function (r) { return { date: normDate_(r[0], opt), wz: String(r[1]), emp: nm(r[5]), amt: Number(r[6]), tx: String(r[3]) }; });
-  brRows.filter(function (b) { return b[0] && b[5] && String(b[6]).toUpperCase() !== 'VOIDED'; })
+  brRows.filter(function (b) { return b[0] && b[5] && !brSkip_(b); })
     .map(function (b) { return { b: b, t: b[2] instanceof Date ? b[2] : new Date(b[2]) }; })
     .sort(function (x, y) { return x.t - y.t; })
     .forEach(function (o) {
@@ -334,18 +355,18 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
         .sort(function (x, y) { return x.date < y.date ? 1 : x.date > y.date ? -1 : 0; })[0];
       if (!hit) return;
       usedTx[hit.tx] = 1;
-      var sid = String(o.b[3]).trim(), def = /^WZ\d/i.test(sid) ? [sid.toUpperCase()] : (map.byBrinksId[sid] || []);
+      var sid = String(o.b[3]).trim(), def = brCands_(o.b, map);
       var notes = [];
       if (def.length !== 1 || def[0] !== hit.wz) notes.push("Brinks ID '" + sid + "' \u2192 matched to " + o.b[5] + "'s cashout");
       if (hit.date !== bagDate_(o.b, opt).date) notes.push('late drop (cashout ' + hit.date + ')');
       empMatch[o.b[0]] = { date: hit.date, wz: hit.wz, note: notes.join('; ') };
     });
   // 1c. Shared Brinks ID, no employee match: exact amount (\u00b1$1) vs an unmatched cashout at one of the sharing stores
-  brRows.filter(function (b) { return b[0] && !empMatch[b[0]] && String(b[6]).toUpperCase() !== 'VOIDED' && (map.byBrinksId[String(b[3]).trim()] || []).length > 1; })
+  brRows.filter(function (b) { return b[0] && !empMatch[b[0]] && !brSkip_(b) && brCands_(b, map).length > 1; })
     .map(function (b) { return { b: b, t: b[2] instanceof Date ? b[2] : new Date(b[2]) }; })
     .sort(function (x, y) { return x.t - y.t; })
     .forEach(function (o) {
-      var sid = String(o.b[3]).trim(), cands = map.byBrinksId[sid], amt = Number(o.b[7]) || 0, cd = opt.fmt(o.t), lo = addDays_(cd, -14);
+      var sid = String(o.b[3]).trim(), cands = brCands_(o.b, map), amt = Number(o.b[7]) || 0, cd = opt.fmt(o.t), lo = addDays_(cd, -14);
       var hit = outs.filter(function (x) { return !usedTx[x.tx] && cands.indexOf(x.wz) >= 0 && Math.abs(x.amt - amt) <= 1 && x.date <= cd && x.date >= lo; })
         .sort(function (x, y) { return x.date < y.date ? 1 : x.date > y.date ? -1 : 0; })[0];
       if (!hit) return;
@@ -355,11 +376,11 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
       empMatch[o.b[0]] = { date: hit.date, wz: hit.wz, note: notes.join('; ') };
     });
   brRows.forEach(function (b) {
-    if (!b[0] || String(b[6]).toUpperCase() === 'VOIDED') return;
+    if (!b[0] || brSkip_(b)) return;
     var sid = String(b[3]).trim(), em = empMatch[b[0]];
     var d = em ? { date: em.date, note: em.note } : bagDate_(b, opt);
     if (d.date !== bizDate) return;
-    var cands = em ? [em.wz] : /^WZ\d/i.test(sid) ? [sid.toUpperCase()] : (map.byBrinksId[sid] || []);
+    var cands = em ? [em.wz] : brCands_(b, map);
     if (cands.length > 1) {
       var byLoc = cands.filter(function (w) { return map.byWZ[w].location === String(b[4]).trim(); });
       if (byLoc.length === 1) cands = byLoc;
@@ -409,6 +430,15 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
 }
 
 /** A bag's business date: explicit date in comments wins; else created date, minus 1 day if before cutoff hour. */
+/** Stores a Brinks row can belong to: Location # (unique per store) first, then a WZ-style Store ID, then the (possibly shared) Brinks Store ID. */
+function brCands_(b, map) {
+  var loc = String(b[17] || '').trim();
+  if (loc && map.byLocNum && map.byLocNum[loc]) return [map.byLocNum[loc]];
+  var sid = String(b[3]).trim();
+  return /^WZ\d/i.test(sid) ? [sid.toUpperCase()] : (map.byBrinksId[sid] || []);
+}
+function brSkip_(b) { return /^(voided|test)$/i.test(String(b[6]).trim()); }
+
 function bagDate_(b, opt) {
   var created = b[2] instanceof Date ? b[2] : new Date(b[2]);
   var cDate = opt.fmt(created);
@@ -511,7 +541,8 @@ function setupTabs() {
     TOLERANCE: '$ difference treated as coins/minor', NEXT_MORNING_CUTOFF_HOUR: 'Bags created before this hour count for the previous day',
     RQ_FOLDER_PATH: 'Drive folder the Mac mini saves RQ files to', BRINKS_FOLDER_PATH: 'Drive folder for saved Brinks attachments',
     RECON_TEAM: 'Back-office team \u2014 always gets the daily alert (comma-separated emails)',
-    BRINKS_QUERY: 'Gmail search for the Brinks Deposit Report', RECHECK_DAYS: 'Recent days re-reconciled each run (late bags)',
+    BRINKS_QUERY: 'Gmail search for the Brinks Deposit Report', DEVICE_QUERY: 'Gmail search for the Brinks Device Activity report (all safe types)',
+    BRINKS_IMPORT_PATH: 'Drive folder for manual Brinks exports (loaded automatically)', RECHECK_DAYS: 'Recent days re-reconciled each run (late bags)',
     MISSING_FILE_ALERT_HOUR: 'Hour after which a missing-input email is sent'
   };
   Object.keys(DEFAULT_CFG).forEach(function (k) { if (have.indexOf(k) < 0) cfgSh.appendRow([k, DEFAULT_CFG[k], help[k] || '']); });
@@ -542,15 +573,17 @@ function loadStoreMap_() {
   var rows = ss_().getSheetByName(TABS.MAP).getDataRange().getValues();
   var h = rows[0].map(String), c = function (n) { return h.indexOf(n); };
   var iN = c('Store Name'), iCo = c('Brand'), iDM = c('DM'), iDE = c('DM Email'), iA = c('Active'), iB = c('Brinks Store ID'),
-      iL = c('Brinks Location Name'), iW = c('WZ Store ID');
-  var byWZ = {}, byBrinksId = {};
+      iL = c('Brinks Location Name'), iW = c('WZ Store ID'), iLN = c('Brinks ID');
+  var byWZ = {}, byBrinksId = {}, byLocNum = {};
   rows.slice(1).forEach(function (r) {
     var w = String(r[iW]).trim(); if (!w) return;
     byWZ[w] = { name: r[iN], company: r[iCo], dm: String(r[iDM]).trim(), dmEmail: String(r[iDE]).trim(), active: String(r[iA]).trim().toUpperCase() === 'Y',
       brinksId: String(r[iB]).trim(), location: String(r[iL]).trim() };
     if (byWZ[w].brinksId) (byBrinksId[byWZ[w].brinksId] = byBrinksId[byWZ[w].brinksId] || []).push(w);
+    var ln = iLN >= 0 ? String(r[iLN]).trim() : '';
+    if (/^\d+$/.test(ln)) byLocNum[ln] = w;
   });
-  return { byWZ: byWZ, byBrinksId: byBrinksId };
+  return { byWZ: byWZ, byBrinksId: byBrinksId, byLocNum: byLocNum };
 }
 
 function replaceRowsByDate_(tab, headers, dateCol, date, newRows) {
@@ -676,4 +709,68 @@ function netWindow_(dates) {
     sh.getRange(r + 1, 16, 1, 2).setValues([[data[r][15], data[r][16]]]);
   });
   logRun('Net matching ' + dates.join(',') + ': ' + n + ' rows resolved, ' + (changes.length - n) + ' partial notes');
+}
+
+
+// ───────────────────────── BRINKS: manual imports, new installs, catch-up ─────────────────────────
+/** Any .xlsx dropped in Brinks Recon/Brinks Imports is loaded once (Device Activity or Deposit Report export). */
+function ingestBrinksImports_() {
+  var cfg = getCfg_(), props = PropertiesService.getScriptProperties();
+  var folder = folderByPath_(cfg.BRINKS_IMPORT_PATH || 'Brinks Recon/Brinks Imports', true), files = folder.getFiles();
+  var tz = Session.getScriptTimeZone();
+  while (files.hasNext()) {
+    var f = files.next();
+    if (!/\.xlsx?$/i.test(f.getName())) continue;
+    var key = 'bi_' + f.getId() + '_' + f.getLastUpdated().getTime();
+    if (props.getProperty(key)) continue;
+    try {
+      var rd = Utilities.formatDate(f.getDateCreated(), tz, 'yyyy-MM-dd');
+      var parsed = parseBrinksRows(xlsxToValues_(f.getBlob(), f.getName()), rd, 'import:' + f.getName());
+      upsertBrinks_(parsed);
+      activateNewInstalls_(parsed);
+      props.setProperty(key, '1');
+      logRun('Brinks import ' + f.getName() + ': ' + parsed.length + ' rows');
+    } catch (e) { logRun('Brinks import ' + f.getName() + ' skipped: ' + e.message); }
+  }
+}
+
+/** A deposit under a WZ#### Store ID turns on the matching pending Store Map row (Brinks ID = Location #, Active = Y). */
+function activateNewInstalls_(parsed) {
+  var seen = {};
+  parsed.forEach(function (r) { if (/^WZ\d+/i.test(r[3]) && /^\d+$/.test(String(r[17]))) seen[r[3].toUpperCase()] = r; });
+  var wzs = Object.keys(seen); if (!wzs.length) return;
+  var sh = ss_().getSheetByName(TABS.MAP), data = sh.getDataRange().getValues(), h = data[0].map(String);
+  var c = function (n) { return h.indexOf(n); }, iW = c('WZ Store ID'), iB = c('Brinks ID'), iS = c('Brinks Store ID'), iL = c('Brinks Location Name'),
+      iA = c('Active'), iN = c('Notes'), iName = c('Store Name');
+  var tz = Session.getScriptTimeZone(), today = Utilities.formatDate(new Date(), tz, 'M/d/yyyy'), done = [];
+  for (var i = 1; i < data.length; i++) {
+    var w = String(data[i][iW]).trim().toUpperCase(), r = seen[w];
+    if (!r || String(data[i][iB]).trim()) continue;
+    var row = i + 1;
+    sh.getRange(row, iB + 1).setValue(String(r[17]));
+    if (iS >= 0 && !String(data[i][iS]).trim()) sh.getRange(row, iS + 1).setValue(r[3]);
+    if (iL >= 0 && !String(data[i][iL]).trim()) sh.getRange(row, iL + 1).setValue(r[4]);
+    sh.getRange(row, iA + 1).setValue('Y');
+    if (iN >= 0) sh.getRange(row, iN + 1).setValue('Auto-activated ' + today + ': first Brinks deposit (Location # ' + r[17] + ')');
+    done.push(w + ' ' + data[i][iName] + ' → Location # ' + r[17]);
+  }
+  if (!done.length) return;
+  logRun('New Brinks installs activated: ' + done.join(', '));
+  try {
+    MailApp.sendEmail(adminEmail_(), 'Cash Recon: ' + done.length + ' new Brinks install(s) activated',
+      'These stores made their first Brinks deposit and are now in the daily recon:\n\n' + done.join('\n') +
+      '\n\nFill in DM / Store Manager on the Store Map so they get the right alerts.');
+  } catch (e) { logRun('Install email failed: ' + e.message); }
+}
+
+/** Manual: load everything new (incl. Brinks Imports), then re-run recon + netting for the last N days. */
+function brinksCatchUp(days) {
+  var n = Number(days) || 7, tz = Session.getScriptTimeZone();
+  var hdr = ss_().getSheetByName(TABS.BR);
+  if (hdr && hdr.getLastColumn() < BR_HEADERS.length) hdr.getRange(1, 1, 1, BR_HEADERS.length).setValues([BR_HEADERS]).setFontWeight('bold');
+  ingestBrinks();
+  var target = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), win = [];
+  for (var i = n - 1; i >= 0; i--) { var d = addDays_(target, -i); win.push(d); reconcileAndWrite_(d); }
+  netWindow_(win);
+  logRun('brinksCatchUp: re-ran ' + win[0] + ' → ' + win[win.length - 1]);
 }
