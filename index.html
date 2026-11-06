@@ -183,10 +183,7 @@ h3{font-size:15px;margin:0;font-weight:650}
   .app{grid-template-columns:minmax(0,1fr)}
   .side{display:none}
   main{padding-top:12px}
-  .mbar{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 4px}
-  .mbar::-webkit-scrollbar{display:none}
-  .mbar button{background:var(--surface);border-radius:999px;padding:7px 14px;white-space:nowrap;font-weight:500;font-size:14px}
-  .mbar button[aria-current="page"]{background:var(--accent);color:#fff}
+  .mbar{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .tiles .tile:first-child{grid-column:1/-1}
   h1{font-size:28px}
@@ -204,7 +201,28 @@ h3{font-size:15px;margin:0;font-weight:650}
 @media (max-width:860px){.tiles.t4{grid-template-columns:repeat(2,minmax(0,1fr))}.tiles.t4 .tile:first-child{grid-column:auto}}
 .mtheme{display:none}
 .theme-seg button{padding:4px 10px;font-size:12px}
-@media (max-width:860px){.mtheme{display:flex;justify-content:flex-end;margin-top:-8px}}
+/* Mobile menu: iOS Settings-style sheet */
+.mmenu{display:flex;align-items:center;gap:6px;color:var(--accent);font-size:17px;padding:8px 8px 8px 0;min-height:44px}
+.mmenu svg{width:22px;height:22px}
+.mopen{display:flex;align-items:center;gap:6px;color:var(--red);font-size:15px;font-weight:600;min-height:44px;padding:0 0 0 8px}
+.mopen .badge{background:var(--red);color:#fff;min-width:22px;height:22px;border-radius:11px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.msh .sh-body{gap:22px}
+.mgrab{width:36px;height:5px;border-radius:3px;background:var(--faint);margin:8px auto 0;opacity:.7}
+.mgrp{background:var(--surface);border-radius:10px;overflow:hidden}
+.mgrp-h{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;margin:0 0 6px 16px}
+.mrow{display:flex;align-items:center;gap:12px;width:100%;padding:0 0 0 16px;text-align:left;font-size:17px;color:var(--fg)}
+.mrow .in{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:46px;padding-right:14px;border-bottom:.5px solid var(--sep);min-width:0}
+.mrow:last-child .in{border-bottom:0}
+.mrow[aria-current="page"]{background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.mrow .ico{width:29px;height:29px}
+.mrow .ico svg{width:17px;height:17px}
+.mdet{color:var(--muted);display:flex;align-items:center;gap:6px;font-size:16px;white-space:nowrap}
+.mdet .badge{background:var(--red);color:#fff;min-width:24px;height:24px;border-radius:12px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:600}
+.mdet .chk{color:var(--accent);display:flex}.mdet .chk svg{width:16px;height:16px}
+.mchev{color:var(--faint);display:flex}.mchev svg{width:14px;height:14px}
+.mav{width:44px;height:44px;border-radius:22px;background:var(--accent);color:#fff;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;margin:8px 0}
+.mout{width:100%;min-height:46px;color:var(--red);font-size:17px}
+.mfoot{text-align:center;font-size:13px;color:var(--muted);margin-top:-8px}
 .p-combo{background:color-mix(in srgb,var(--indigo) 16%,transparent);color:var(--indigo)}
 .lockbar{display:flex;gap:12px;align-items:center;justify-content:space-between;background:var(--surface);border-radius:var(--r-lg);padding:10px 14px;font-size:14px;color:var(--muted);flex-wrap:wrap}
 .lockbar.on{background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--fg)}
@@ -449,7 +467,36 @@ function renderSide(){
   $("side").querySelectorAll("[data-day]").forEach(x=>x.onclick=()=>{ S.view="day"; loadDay(x.dataset.day); });
   $("so").onclick=()=>signOut();
 }
-function mbar(){ return `<div class="mbar">${navItems().map(([k,l,,,n])=>`<button data-mview="${k}" ${S.view===k?'aria-current="page"':""}>${l}${n&&k==="open"?` · ${n}`:""}</button>`).join("")}<button data-mview="signout">Sign out</button></div><div class="mtheme">${themeSeg()}</div>`; }
+const MENU_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+const CHECK_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function mbar(){
+  const n=S.boot&&S.boot.carry?S.boot.carry.length:0;
+  return `<div class="mbar"><button class="mmenu" id="mmenu" aria-haspopup="dialog">${MENU_IC}Menu</button>${n&&S.view!=="open"?`<button class="mopen" data-mview="open" aria-label="${n} still open">Still open <span class="badge">${n}</span></button>`:""}</div>`;
+}
+/* Mobile menu: a sheet styled like iPhone Settings (grouped rows, colored icons). */
+function openMenu(){
+  const b=S.boot, me=S.me||{}, items=navItems();
+  const ini=String(me.name||me.email||"?").split(/[\s.@]+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join("");
+  const day=b&&S.date?(b.days.find(d=>d.date===S.date)||null):null;
+  const det=(k,n)=>k==="open"&&n?`<span class="badge">${n}</span>`:k==="day"&&day?(day.open?day.open+" open":"All matched"):n?esc(n):"";
+  const row=([k,l,ic,c,n])=>`<button class="mrow" data-mgo="${k}" ${S.view===k?'aria-current="page"':""}><span class="ico" style="background:${c}">${ic}</span><span class="in"><span>${l}</span><span class="mdet">${det(k,n)}${S.view===k?`<span class="chk">${CHECK_IC}</span>`:""}</span></span></button>`;
+  const main=items.filter(i=>["day","open","safe","score","cal","stores"].includes(i[0])), more=items.filter(i=>["export","team"].includes(i[0]));
+  const days=b?b.days.slice(0,5):[];
+  openSheet(`<div class="msh" role="dialog" aria-label="Menu" style="display:contents"><div class="mgrab" aria-hidden="true"></div>
+    <div class="sh-head"><span style="width:52px"></span><b style="font-size:17px">Cash Recon</b><button class="btn-link" data-close style="width:52px;text-align:right;color:var(--accent);font-weight:600;font-size:17px;min-height:44px">Done</button></div>
+    <div class="sh-body">
+      <div class="mgrp"><div class="mrow" style="cursor:default"><span class="mav">${esc(ini)}</span><span class="in" style="min-height:60px"><span style="display:flex;flex-direction:column"><b>${esc(me.name||me.email||"")}</b><span style="font-size:13px;color:var(--muted)">${esc(me.role||"")}${b?` · ${b.stores.length} store${b.stores.length===1?"":"s"}`:""}</span></span></span></div></div>
+      <div class="mgrp">${main.map(row).join("")}</div>
+      ${days.length?`<div><p class="mgrp-h">Recent days</p><div class="mgrp">${days.map(d=>`<button class="mrow" data-mday="${d.date}" ${S.view==="day"&&S.date===d.date?'aria-current="page"':""}><span class="in"><span>${dayLabel(d.date)}</span><span class="mdet">${d.open?`<span style="color:var(--red)">${d.open} open</span>`:"✓ Matched"}<span class="mchev">${IC.next}</span></span></span></button>`).join("")}</div></div>`:""}
+      <div class="mgrp">${more.map(row).join("")}<div class="mrow" style="cursor:default"><span class="ico" style="background:#1c1c1e"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span><span class="in"><span>Appearance</span>${themeSeg()}</span></div></div>
+      <div class="mgrp"><button class="mout" id="m-out">Sign out</button></div>
+      ${b&&b.lastRun&&b.lastRun.at?`<p class="mfoot">Last engine run ${new Date(b.lastRun.at).toLocaleString("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"})}${b.testMode?" · Test mode on":""}</p>`:""}
+    </div></div>`);
+  const sh=$("sheet");
+  sh.querySelectorAll("[data-mgo]").forEach(x=>x.onclick=()=>{ closeSheet(); go(x.dataset.mgo); });
+  sh.querySelectorAll("[data-mday]").forEach(x=>x.onclick=()=>{ closeSheet(); S.view="day"; window.scrollTo(0,0); loadDay(x.dataset.mday); });
+  $("m-out").onclick=()=>{ closeSheet(); signOut(); };
+}
 function go(v){ S.view=v; render(); window.scrollTo(0,0);
   if(v==="team"){ if(!S.users) loadUsers(); loadReqs(); }
   if(v==="safe") loadSafe(); if(v==="score"&&!S.scoreData) loadScore(); if(v==="cal"&&!S.calData) loadCal(); }
@@ -460,7 +507,8 @@ function render(){
   const m=$("main");
   m.innerHTML=`<div class="wrap">${mbar()}${S.boot.testMode&&S.me.isAdmin?`<div class="banner"><b>Test mode is on.</b> The daily alert email only goes to the admin + recon team. DMs aren't emailed yet.</div>`:""}${
     ({day:viewDay,open:viewOpen,stores:viewStores,team:viewPeople,safe:viewSafe,score:viewScore,cal:viewCal,export:viewExport}[S.view]||viewDay)()}</div>`;
-  m.querySelectorAll("[data-mview]").forEach(x=>x.onclick=()=>x.dataset.mview==="signout"?signOut():go(x.dataset.mview));
+  m.querySelectorAll("[data-mview]").forEach(x=>x.onclick=()=>go(x.dataset.mview));
+  const mm=$("mmenu"); if(mm) mm.onclick=openMenu;
   bindView();
 }
 
