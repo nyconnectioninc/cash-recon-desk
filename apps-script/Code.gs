@@ -378,7 +378,9 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
         .sort(function (x, y) { return x.date < y.date ? 1 : x.date > y.date ? -1 : 0; })[0];
       if (!hit) return;
       usedTx[hit.tx] = 1;
-      var notes = cands.length > 1 ? ["Brinks ID '" + sid + "' shared \u2192 matched to " + hit.wz + ' cashout by amount'] : [];
+      var redir = map.redirect && map.redirect[String(cands[0]).toUpperCase()];
+      var notes = cands.length > 1 ? [redir ? (hit.wz !== cands[0] ? 'Dropped in ' + cands[0] + ' safe \u2192 matched to ' + hit.wz + ' cashout by amount' : '')
+        : "Brinks ID '" + sid + "' shared \u2192 matched to " + hit.wz + ' cashout by amount'].filter(String) : [];
       if (hit.date !== bagDate_(o.b, opt).date) notes.push('late drop (cashout ' + hit.date + ')');
       empMatch[o.b[0]] = { date: hit.date, wz: hit.wz, note: notes.join('; ') };
     });
@@ -388,7 +390,7 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
     var d = em ? { date: em.date, note: em.note } : bagDate_(b, opt);
     if (d.date !== bizDate) return;
     var cands = em ? [em.wz] : brCands_(b, map);
-    if (cands.length > 1) {
+    if (cands.length > 1 && !(map.redirect && map.redirect[String(cands[0]).toUpperCase()])) {
       var byLoc = cands.filter(function (w) { return map.byWZ[w].location === String(b[4]).trim(); });
       if (byLoc.length === 1) cands = byLoc;
     }
@@ -439,10 +441,11 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
 /** A bag's business date: explicit date in comments wins; else created date, minus 1 day if before cutoff hour. */
 /** Stores a Brinks row can belong to: Location # (unique per store) first, then a WZ-style Store ID, then the (possibly shared) Brinks Store ID. */
 function brCands_(b, map) {
-  var loc = String(b[17] || '').trim();
-  if (loc && map.byLocNum && map.byLocNum[loc]) return [map.byLocNum[loc]];
-  var sid = String(b[3]).trim();
-  return /^WZ\d/i.test(sid) ? [sid.toUpperCase()] : (map.byBrinksId[sid] || []);
+  var loc = String(b[17] || '').trim(), sid = String(b[3]).trim();
+  var base = loc && map.byLocNum && map.byLocNum[loc] ? [map.byLocNum[loc]] : /^WZ\d/i.test(sid) ? [sid.toUpperCase()] : (map.byBrinksId[sid] || []);
+  // Store Map "Deposits At": another store's cash goes into this safe (e.g. 1556Flat drops at 5th St), so its bags can belong to either
+  if (base.length === 1 && map.redirect && map.redirect[base[0].toUpperCase()]) return base.concat(map.redirect[base[0].toUpperCase()]);
+  return base;
 }
 function brSkip_(b) { return /^(voided|test)$/i.test(String(b[6]).trim()); }
 
@@ -580,8 +583,8 @@ function loadStoreMap_() {
   var rows = ss_().getSheetByName(TABS.MAP).getDataRange().getValues();
   var h = rows[0].map(String), c = function (n) { return h.indexOf(n); };
   var iN = c('Store Name'), iCo = c('Brand'), iDM = c('DM'), iDE = c('DM Email'), iA = c('Active'), iB = c('Brinks Store ID'),
-      iL = c('Brinks Location Name'), iW = c('WZ Store ID'), iLN = c('Brinks ID');
-  var byWZ = {}, byBrinksId = {}, byLocNum = {};
+      iL = c('Brinks Location Name'), iW = c('WZ Store ID'), iLN = c('Brinks ID'), iDA = c('Deposits At');
+  var byWZ = {}, byBrinksId = {}, byLocNum = {}, redirect = {};
   rows.slice(1).forEach(function (r) {
     var w = String(r[iW]).trim(); if (!w) return;
     byWZ[w] = { name: r[iN], company: r[iCo], dm: String(r[iDM]).trim(), dmEmail: String(r[iDE]).trim(), active: String(r[iA]).trim().toUpperCase() === 'Y',
@@ -589,8 +592,10 @@ function loadStoreMap_() {
     if (byWZ[w].brinksId) (byBrinksId[byWZ[w].brinksId] = byBrinksId[byWZ[w].brinksId] || []).push(w);
     var ln = iLN >= 0 ? String(r[iLN]).trim() : '';
     if (/^\d+$/.test(ln)) byLocNum[ln] = w;
+    var da = iDA >= 0 ? String(r[iDA]).trim().toUpperCase() : '';   // store whose cash is dropped in another store's safe
+    if (da && da !== w.toUpperCase() && String(r[iA]).trim().toUpperCase() === 'Y') (redirect[da] = redirect[da] || []).push(w);
   });
-  return { byWZ: byWZ, byBrinksId: byBrinksId, byLocNum: byLocNum };
+  return { byWZ: byWZ, byBrinksId: byBrinksId, byLocNum: byLocNum, redirect: redirect };
 }
 
 function replaceRowsByDate_(tab, headers, dateCol, date, newRows) {
