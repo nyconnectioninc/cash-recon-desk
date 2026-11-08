@@ -341,6 +341,10 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
     rqBy[r[1]] = (rqBy[r[1]] || 0) + (Number(r[6]) || 0);
   });
 
+  // 1a. Range deposits: a bag whose comment covers a date range ("1556 Cash 10/30 - 11/05") is split across those days
+  var rng = rangeDeposits_(bizDate, rqRows, brRows, map, opt);
+  brRows = brRows.filter(function (b) { return !rng.skip[String(b[0])]; });
+
   // 2. Brinks bags -> business date (+ candidate stores)
   var bags = [];
   // 1b. Strongest evidence: same employee + same amount as an RQ cashout (beats Brinks Store ID and created date)
@@ -397,6 +401,7 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
     bags.push({ barcode: b[0], amount: Number(b[7]) || 0, status: String(b[6]), cands: cands, sid: sid, dateNote: d.note, comments: String(b[10] || '') });
   });
 
+  rng.today.forEach(function (x) { bags.push(x); });
   var brBy = {}, bagsBy = {}, notesBy = {}, assignments = [], unmapped = [];
   var addNote = function (w, n) { (notesBy[w] = notesBy[w] || []).push(n); };
   var assign = function (bag, w, note) {
@@ -788,4 +793,51 @@ function brinksCatchUp(days) {
   for (var i = n - 1; i >= 0; i--) { var d = addDays_(target, -i); win.push(d); reconcileAndWrite_(d); }
   netWindow_(win);
   logRun('brinksCatchUp: re-ran ' + win[0] + ' → ' + win[win.length - 1]);
+}
+
+
+/** Bags whose comment names a date range ("10/30 - 11/05") are pooled per store + range and spread over those days:
+ *  each day gets up to its RQ cash (oldest first); what's left goes to the first day in the range with no RQ file (cash from
+ *  before the RQ pull started), else to the last day. The store is the bag's own, or — when several stores can use the safe
+ *  (shared ID / "Deposits At") — the one the comment names ("1556", "WZ1370", "1556Flat"). Returns today's share + bags to skip. */
+function rangeDeposits_(bizDate, rqRows, brRows, map, opt) {
+  var re = /(?<![$\d.])(1[0-2]|0?[1-9])[\/.](3[01]|[12]\d|0?[1-9])(?:[\/.]\d{2,4})?\s*(?:-|–|to|thru|through)\s*(1[0-2]|0?[1-9])[\/.](3[01]|[12]\d|0?[1-9])\b/i;
+  var groups = {}, skip = {}, today = [];
+  var tokens = function (w) {
+    var s = map.byWZ[w] || {}, nm = String(s.name || '').toLowerCase(), t = [w.toLowerCase(), nm.replace(/\s+/g, '')];
+    var d = w.replace(/\D/g, ''); if (d.length >= 3) t.push(d);
+    var lead = (nm.match(/^\d{3,}/) || [])[0]; if (lead) t.push(lead);
+    return t.filter(String);
+  };
+  var names = function (com, w) {
+    return tokens(w).some(function (t) { return /^\d+$/.test(t) ? new RegExp('(^|\\D)' + t + '(\\D|$)').test(com) : com.indexOf(t) >= 0; });
+  };
+  brRows.forEach(function (b) {
+    if (!b[0] || brSkip_(b)) return;
+    var com = String(b[10] || ''), m = com.match(re); if (!m) return;
+    var cands = brCands_(b, map), lc = com.toLowerCase(), target = null;
+    if (cands.length === 1) target = cands[0];
+    else { var hit = cands.filter(function (w) { return names(lc, w); }); if (hit.length === 1) target = hit[0]; }
+    if (!target) return;
+    var created = b[2] instanceof Date ? b[2] : new Date(b[2]), cd = opt.fmt(created), y = +cd.slice(0, 4);
+    var mk = function (mo, da) { var yy = +mo > +cd.slice(5, 7) ? y - 1 : y; return yy + '-' + ('0' + mo).slice(-2) + '-' + ('0' + da).slice(-2); };
+    var a = mk(m[1], m[2]), z = mk(m[3], m[4]);
+    if (z < a || z > cd || (new Date(z) - new Date(a)) / 864e5 > 31) return;     // nonsense range: leave the bag alone
+    var k = target + '|' + a + '|' + z, g = groups[k] = groups[k] || { wz: target, from: a, to: z, amt: 0, codes: [] };
+    g.amt += Number(b[7]) || 0; g.codes.push(String(b[0])); skip[String(b[0])] = 1;
+  });
+  var rqDay = {}, rqHas = {};
+  rqRows.forEach(function (r) { var d = normDate_(r[0], opt); rqHas[d] = 1; if (r[1]) rqDay[r[1] + '|' + d] = (rqDay[r[1] + '|' + d] || 0) + (Number(r[6]) || 0); });
+  var used = {};   // overlapping ranges for the same store ("1 of 2" 10/30-11/05, "2 of 2" 10/30-11/04) share each day's cash
+  Object.keys(groups).sort(function (x, y) { var gx = groups[x], gy = groups[y]; return gx.from < gy.from ? -1 : gx.from > gy.from ? 1 : gx.to < gy.to ? -1 : gx.to > gy.to ? 1 : 0; }).forEach(function (k) {
+    var g = groups[k], days = [], d = g.from;
+    while (d <= g.to) { days.push(d); d = addDays_(d, 1); }
+    var share = {}, rem = round2_(g.amt);
+    days.forEach(function (x) { var key = g.wz + '|' + x, need = round2_((rqDay[key] || 0) - (used[key] || 0)); var take = round2_(Math.min(rem, need));
+      if (take > 0) { share[x] = take; used[key] = round2_((used[key] || 0) + take); rem = round2_(rem - take); } });
+    if (rem > 0.004) { var spot = days.filter(function (x) { return !rqHas[x]; })[0] || g.to; share[spot] = round2_((share[spot] || 0) + rem); }
+    if (share[bizDate]) today.push({ barcode: 'RANGE:' + g.codes.join('+'), amount: share[bizDate], status: 'ACH', cands: [g.wz], sid: '', comments: '',
+      dateNote: 'Range deposit ' + g.from.slice(5).replace('-', '/') + '–' + g.to.slice(5).replace('-', '/') + ' (' + g.codes.length + ' bag' + (g.codes.length > 1 ? 's' : '') + ', $' + round2_(g.amt) + ') → $' + share[bizDate] + ' for this day' });
+  });
+  return { skip: skip, today: today };
 }
