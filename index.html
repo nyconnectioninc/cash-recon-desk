@@ -300,7 +300,8 @@ const STATUS = {
   "SHORT":{cls:"p-short",label:"Short",color:"var(--orange)",open:1},
   "OVER":{cls:"p-over",label:"Over",color:"var(--purple)",open:1},
   "BRINKS ONLY":{cls:"p-bonly",label:"Bag, no cashout",color:"var(--teal)",open:1},
-  "MINOR":{cls:"p-minor",label:"Coins",color:"var(--faint)"},
+  "MINOR":{cls:"p-ok",label:"Match · coins",color:"var(--green)"},
+  "MATCH (coins)":{cls:"p-ok",label:"Match · coins",color:"var(--green)"},
   "MATCH":{cls:"p-ok",label:"Match",color:"var(--green)"},
   "MATCH ($0 day)":{cls:"p-ok",label:"$0 day",color:"var(--green)"},
   "NO ACTIVITY":{cls:"p-none",label:"No activity",color:"var(--faint)"}
@@ -978,7 +979,7 @@ function viewPeople(){
     ${perm.map(r=>`<div class="pr"><span>${r[0]}</span>${r.slice(1).map(v=>`<span class="${v==="—"?"no":v==="✓"?"yes":"part"}">${v}</span>`).join("")}</div>`).join("")}</div></div>
   <div><div class="group-h"><h2>Settings</h2></div><form class="form" id="setf" style="max-width:520px"><div class="row2" style="grid-template-columns:1fr 1fr">
     <label>Variance tolerance ($)<input id="st-t" inputmode="decimal" value="${S.boot.tolerance}"></label><label>Safe limit ($)<input id="st-l" inputmode="numeric" value="${S.boot.safeLimit}"></label></div>
-    <p class="fine" style="margin:0">Differences within the tolerance show as "Coins". New values apply from the next engine run (and when you re-run a day).</p><p class="err" id="st-err"></p><button class="btn primary" type="submit">Save settings</button></form></div>`;
+    <p class="fine" style="margin:0">Differences within the tolerance count as reconciled and show as "Match · coins". New values apply from the next engine run (and when you re-run a day).</p><p class="err" id="st-err"></p><button class="btn primary" type="submit">Save settings</button></form></div>`;
 }
 function bindPeople(){
   const m=$("main");
