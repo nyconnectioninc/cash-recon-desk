@@ -21,7 +21,7 @@ var DEFAULT_CFG = {
   ADMIN_EMAIL: '',                   // blank = the account running the script
   EXTRA_ALERT_TO: '',                // comma-separated, added when TEST_MODE is FALSE
   RECON_TEAM: '',                    // comma-separated, ALWAYS get the daily alert (back-office deposit matchers)
-  TOLERANCE: '5',                    // $ — differences within this are "MINOR"
+  TOLERANCE: '5',                    // $ — differences within this are reconciled as "MATCH (coins)"
   NEXT_MORNING_CUTOFF_HOUR: '11',    // bags created before this hour count for the PREVIOUS business day
   RQ_FOLDER_PATH: 'Brinks Recon/RQ Cash Audit',
   BRINKS_FOLDER_PATH: 'Brinks Recon/Brinks Deposits',
@@ -434,7 +434,7 @@ function reconcileCore(bizDate, rqRows, brRows, map, opt) {
     else if (!hasRQ) st = 'BRINKS ONLY';
     else if (r > 0 && b === 0) st = 'MISSING DEPOSIT';
     else if (d === 0) st = r === 0 ? 'MATCH ($0 day)' : 'MATCH';
-    else if (Math.abs(d) <= opt.tolerance) st = 'MINOR';
+    else if (Math.abs(d) <= opt.tolerance) st = 'MATCH (coins)';   // within tolerance = reconciled, still reported
     else st = d < 0 ? 'SHORT' : 'OVER';
     summary[st] = (summary[st] || 0) + 1;
     rows.push({ date: bizDate, wz: w, store: s.name, company: s.company, dm: s.dm, dmEmail: s.dmEmail, rq: r, brinks: b, diff: d,
@@ -505,7 +505,8 @@ function sendAlert_(bizDate) {
     var base = String(r[8]);
     if (base === 'NO ACTIVITY') return;
     total++;
-    if (/^MATCH/.test(base)) matched++;
+    if (base === 'MINOR' || /coins/.test(base)) { matched++; groups.MINOR.push(r); }   // within tolerance: reconciled, listed for info
+    else if (/^MATCH/.test(base)) matched++;
     else if (groups[base]) groups[base].push(r);
   });
   var money = function (n) { return (n < 0 ? '-$' : '$') + Math.abs(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
@@ -531,7 +532,7 @@ function sendAlert_(bizDate) {
     table('⚠️ Short', '#e37400', groups.SHORT) +
     table('⚠️ Over', '#e37400', groups.OVER) +
     table('🔵 Brinks bag, no RQ cashout', '#1a73e8', groups['BRINKS ONLY']) +
-    table('🟡 Within $' + cfg.TOLERANCE + ' (coins)', '#9aa0a6', groups.MINOR) +
+    table('🟡 Reconciled within $' + cfg.TOLERANCE + ' (coins, FYI — counted as matched)', '#9aa0a6', groups.MINOR) +
     table('✅ Resolved — late drop nets out', '#188038', groups.NETTED) +
     '<p style="color:#888;font-size:12px;margin-top:20px">Log manual adjustments in Daily_Log (Manual Adj $ / Adj Reason). They are never overwritten.</p></div>';
   var to = [adminEmail_()].concat(String(cfg.RECON_TEAM || '').split(/[,;\s]+/));
