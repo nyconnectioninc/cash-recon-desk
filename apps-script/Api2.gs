@@ -195,21 +195,26 @@ function desk2Safe_(me) {
     o.stores.push({ wz: w, name: String(s.name), dm: s.dm });
     if (lim[w]) o.limit = Math.max(o.limit, lim[w]);
   });
-  var picked = {}, events = {};
-  readTab_(DESK2.PICK).forEach(function (r) {
-    if (!r[0] || !/pickup/i.test(String(r[4]))) return;
-    var t = r[1] instanceof Date ? r[1].getTime() : new Date(r[1]).getTime(), sid = String(r[2]).trim();
-    picked[String(r[0])] = t;
-    var e = (events[sid] = events[sid] || {}); e[t] = (e[t] || 0) + 1;
-  });
-  var bySid = {}, depositBags = {}, cover = Infinity;
+  var bySid = {}, depositBags = {}, owner = {}, cover = Infinity;
   readTab_(TABS.BR).forEach(function (b) {
     if (!b[0]) return;
     var t = b[2] instanceof Date ? b[2].getTime() : new Date(b[2]).getTime();
     if (/^SD-/.test(String(b[0]))) return;   // smart-safe (bill feeder) deposits have no bag barcode to match to pickups
-    cover = Math.min(cover, t); depositBags[String(b[0])] = 1;
+    cover = Math.min(cover, t); depositBags[String(b[0])] = 1; owner[String(b[0])] = String(b[3]).trim();
     if (/^(voided|test)$/i.test(String(b[6]).trim())) return;
     (bySid[String(b[3]).trim()] = bySid[String(b[3]).trim()] || []).push({ bag: String(b[0]), t: t, amt: Number(b[7]) || 0, by: String(b[5]), wz: String(b[13] || '') });
+  });
+  // Brinks sometimes files a pickup under another store's ID (Quality under "Hooksett") or an old ID ("NHVER", "MA 555").
+  // Credit each picked-up bag to the safe it was dropped in; fall back to Config PICKUP_ALIASES, then the report's Store ID.
+  var alias = {};
+  String(cfg.PICKUP_ALIASES || 'NHVER=Hooksett, MA 555=WZ1456').split(/[,;]/).forEach(function (x) { var kv = x.split('='); if (kv.length === 2) alias[kv[0].trim()] = kv[1].trim(); });
+  var picked = {}, events = {};
+  readTab_(DESK2.PICK).forEach(function (r) {
+    if (!r[0] || !/pickup/i.test(String(r[4]))) return;
+    var t = r[1] instanceof Date ? r[1].getTime() : new Date(r[1]).getTime(), raw = String(r[2]).trim();
+    var sid = owner[String(r[0])] || alias[raw] || raw;
+    picked[String(r[0])] = t;
+    var e = (events[sid] = events[sid] || {}); e[t] = (e[t] || 0) + 1;
   });
   var rq = readTab_(TABS.RQ), rqFirst = rq.reduce(function (m, r) { var d = normDate_(r[0]); return !m || d < m ? d : m; }, '');
   var out = Object.keys(safes).map(function (id) {
