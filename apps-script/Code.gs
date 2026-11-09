@@ -21,6 +21,7 @@ var DEFAULT_CFG = {
   ADMIN_EMAIL: '',                   // blank = the account running the script
   EXTRA_ALERT_TO: '',                // comma-separated, added when TEST_MODE is FALSE
   RECON_TEAM: '',                    // comma-separated, ALWAYS get the daily alert (back-office deposit matchers)
+  SM_ALERTS: 'issues',               // store-manager emails: issues = only stores with a problem · all = every store daily · off
   TOLERANCE: '5',                    // $ — differences within this are reconciled as "MATCH (coins)"
   NEXT_MORNING_CUTOFF_HOUR: '11',    // bags created before this hour count for the PREVIOUS business day
   RQ_FOLDER_PATH: 'Brinks Recon/RQ Cash Audit',
@@ -543,6 +544,72 @@ function sendAlert_(bizDate) {
   to = to.map(function (e) { return String(e).trim().toLowerCase(); }).filter(function (e, i, a) { return e && a.indexOf(e) === i; });
   MailApp.sendEmail({ to: to.join(','), subject: subj, htmlBody: html });
   logRun('Alert sent for ' + bizDate + ' to ' + to.join(','));
+  try { sendStoreAlerts_(bizDate, log, cfg, day, money); } catch (e) { logRun('Store-manager alerts failed: ' + e); }
+}
+
+// ───────────────────────── STORE-MANAGER ALERTS ─────────────────────────
+/** One email per store, to that store's SM (cc its DM). Only their own store.
+ *  SM_ALERTS: issues (default) = stores with an open problem · all = every store with activity · off.
+ *  TEST_MODE: nothing goes to SMs/DMs — the admin gets ONE preview email with every message that would have gone out. */
+var SM_ACTION = {
+  'MISSING DEPOSIT': 'RQ shows cash for this day but no Brinks bag was found. Drop the deposit today and reply with the bag # (or the reason it was not dropped).',
+  'SHORT': 'Your Brinks bag is LESS than the RQ cashout. Recount the drawer/safe and reply with the reason (approved skim? who approved it?).',
+  'OVER': 'Your Brinks bag is MORE than the RQ cashout. Check whether cash from another day was included and reply with the explanation.',
+  'BRINKS ONLY': 'A Brinks bag was received but there is no RQ cashout for this day. Make sure the cash audit was completed in RQ and reply with the details.'
+};
+function sendStoreAlerts_(bizDate, log, cfg, day, money) {
+  var mode = String(cfg.SM_ALERTS || 'issues').trim().toLowerCase();
+  if (mode === 'off') return;
+  var map = loadStoreMap_(), test = isTest_(cfg), out = [], noSM = [];
+  log.forEach(function (r) {
+    var fs = String(r[16] || r[8]), base = fs.replace(/ \(adj\)$/, '');
+    if (/NO ACTIVITY/.test(base)) return;
+    var open = !/RESOLVED/.test(fs) && !!SM_ACTION[base];
+    if (!open && mode !== 'all') return;
+    var s = map.byWZ[r[1]] || {};
+    if (!s.smEmail) { if (open) noSM.push(r[2] + ' (' + r[1] + ')'); return; }
+    var coins = base === 'MINOR' || /coins/.test(base);
+    var label = open ? ({ 'MISSING DEPOSIT': 'Missing deposit', 'SHORT': 'Short', 'OVER': 'Over', 'BRINKS ONLY': 'Bag, no RQ cashout' })[base]
+                     : coins ? 'Reconciled (within $' + cfg.TOLERANCE + ')' : 'Reconciled';
+    var color = open ? (base === 'MISSING DEPOSIT' ? '#c5221f' : '#e37400') : '#188038';
+    var diff = Number(r[15] !== '' && r[15] != null ? r[15] : r[7]) || 0;
+    var subj = (open ? '⚠️ ' : '✅ ') + r[2] + ' — ' + label + ' for ' + day + (open ? ' (' + money(diff) + ')' : '');
+    var html = '<div style="font:14px Arial;color:#202124;max-width:560px">' +
+      '<p>Hi ' + (String(s.sm).split(/[ ,&]/)[0] || 'team') + ',</p>' +
+      '<p>Here is the cash deposit check for <b>' + r[2] + '</b> (' + r[1] + ') for <b>' + day + '</b>:</p>' +
+      '<table cellpadding="7" style="border-collapse:collapse;font:14px Arial;border:1px solid #e0e0e0">' +
+      '<tr><td style="color:#666">Status</td><td><b style="color:' + color + '">' + label + '</b></td></tr>' +
+      '<tr style="border-top:1px solid #eee"><td style="color:#666">RQ cash deposit</td><td>' + money(r[5]) + '</td></tr>' +
+      '<tr style="border-top:1px solid #eee"><td style="color:#666">Brinks bag(s)</td><td>' + money(r[6]) + (r[9] ? ' · ' + r[9] + ' bag' + (r[9] == 1 ? '' : 's') : '') + '</td></tr>' +
+      '<tr style="border-top:1px solid #eee"><td style="color:#666">Difference</td><td><b>' + money(diff) + '</b></td></tr>' +
+      (r[10] ? '<tr style="border-top:1px solid #eee"><td style="color:#666">Notes</td><td style="color:#555">' + r[10] + '</td></tr>' : '') +
+      '</table>' +
+      (open ? '<p style="margin-top:14px"><b>What to do:</b> ' + SM_ACTION[base] + '</p><p>Reply to this email so your DM and the recon team can close it out.</p>'
+            : '<p style="margin-top:14px">No action needed — thanks for keeping deposits on time.</p>') +
+      '<p style="color:#888;font-size:12px;margin-top:18px">Automated from the Cash Recon system. Bags dropped the next morning are credited to the prior day automatically.</p></div>';
+    out.push({ to: s.smEmail, cc: s.dmEmail, subj: subj, html: html });
+  });
+  if (!out.length && !noSM.length) return;
+  if (test) {
+    var prev = '<div style="font:14px Arial"><p style="background:#fff3cd;padding:8px">TEST MODE — preview of the ' + out.length +
+      ' store-manager email(s) that WOULD go out for ' + day + '. Nothing was sent to stores.</p>' +
+      (noSM.length ? '<p><b>Open issues with no SM email on the Store Map (' + noSM.length + '):</b> ' + noSM.join(', ') + '</p>' : '') +
+      out.map(function (m) {
+        return '<hr><p style="color:#666;font-size:12px">To: ' + m.to + (m.cc ? ' · Cc: ' + m.cc : '') + '<br>Subject: <b>' + m.subj + '</b></p>' + m.html;
+      }).join('') + '</div>';
+    MailApp.sendEmail({ to: adminEmail_(), subject: '🧪 SM alert preview ' + day + ' — ' + out.length + ' store email(s)', htmlBody: prev });
+    logRun('SM alert preview for ' + bizDate + ': ' + out.length + ' email(s), ' + noSM.length + ' open with no SM');
+    return;
+  }
+  var sent = 0, skipped = 0;
+  out.forEach(function (m) {
+    var need = (m.to + (m.cc ? ',' + m.cc : '')).split(',').length;
+    if (MailApp.getRemainingDailyQuota() < need + 5) { skipped++; return; }   // keep headroom for the admin alert tomorrow
+    MailApp.sendEmail({ to: m.to, cc: m.cc || '', subject: m.subj, htmlBody: m.html, replyTo: [m.cc, adminEmail_()].filter(String).join(',') });
+    sent++;
+  });
+  logRun('SM alerts for ' + bizDate + ': ' + sent + ' sent' + (skipped ? ', ' + skipped + ' skipped (daily email quota)' : '') +
+    (noSM.length ? ', no SM email: ' + noSM.join(', ') : ''));
 }
 
 // ───────────────────────── SETUP / HELPERS ─────────────────────────
@@ -554,7 +621,7 @@ function setupTabs() {
   var help = {
     TEST_MODE: 'TRUE = alerts only to ADMIN_EMAIL. Set FALSE to send to each store\'s DM.',
     ADMIN_EMAIL: 'Blank = the Google account running the script', EXTRA_ALERT_TO: 'Extra recipients (comma-separated), live mode only',
-    TOLERANCE: '$ difference treated as coins/minor', NEXT_MORNING_CUTOFF_HOUR: 'Bags created before this hour count for the previous day',
+    SM_ALERTS: 'Store-manager emails: issues / all / off', TOLERANCE: '$ difference treated as coins/minor', NEXT_MORNING_CUTOFF_HOUR: 'Bags created before this hour count for the previous day',
     RQ_FOLDER_PATH: 'Drive folder the Mac mini saves RQ files to', BRINKS_FOLDER_PATH: 'Drive folder for saved Brinks attachments',
     RECON_TEAM: 'Back-office team \u2014 always gets the daily alert (comma-separated emails)',
     BRINKS_QUERY: 'Gmail search for the Brinks Deposit Report', DEVICE_QUERY: 'Gmail search for the Brinks Device Activity report (all safe types)',
@@ -589,12 +656,14 @@ function loadStoreMap_() {
   var rows = ss_().getSheetByName(TABS.MAP).getDataRange().getValues();
   var h = rows[0].map(String), c = function (n) { return h.indexOf(n); };
   var iN = c('Store Name'), iCo = c('Brand'), iDM = c('DM'), iDE = c('DM Email'), iA = c('Active'), iB = c('Brinks Store ID'),
-      iL = c('Brinks Location Name'), iW = c('WZ Store ID'), iLN = c('Brinks ID'), iDA = c('Deposits At');
+      iL = c('Brinks Location Name'), iW = c('WZ Store ID'), iLN = c('Brinks ID'), iDA = c('Deposits At'),
+      iSM = c('Store Manager'), iSE = c('SM Email');
   var byWZ = {}, byBrinksId = {}, byLocNum = {}, redirect = {};
   rows.slice(1).forEach(function (r) {
     var w = String(r[iW]).trim(); if (!w) return;
     byWZ[w] = { name: r[iN], company: r[iCo], dm: String(r[iDM]).trim(), dmEmail: String(r[iDE]).trim(), active: String(r[iA]).trim().toUpperCase() === 'Y',
-      brinksId: String(r[iB]).trim(), location: String(r[iL]).trim() };
+      brinksId: String(r[iB]).trim(), location: String(r[iL]).trim(),
+      sm: iSM >= 0 ? String(r[iSM]).trim() : '', smEmail: iSE >= 0 ? String(r[iSE]).trim() : '' };
     if (byWZ[w].brinksId) (byBrinksId[byWZ[w].brinksId] = byBrinksId[byWZ[w].brinksId] || []).push(w);
     var ln = iLN >= 0 ? String(r[iLN]).trim() : '';
     if (/^\d+$/.test(ln)) byLocNum[ln] = w;
