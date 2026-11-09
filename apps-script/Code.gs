@@ -536,12 +536,13 @@ function sendAlert_(bizDate) {
     table('🟡 Reconciled within $' + cfg.TOLERANCE + ' (coins, FYI — counted as matched)', '#9aa0a6', groups.MINOR) +
     table('✅ Resolved — late drop nets out', '#188038', groups.NETTED) +
     '<p style="color:#888;font-size:12px;margin-top:20px">Log manual adjustments in Daily_Log (Manual Adj $ / Adj Reason). They are never overwritten.</p></div>';
-  var to = [adminEmail_()].concat(String(cfg.RECON_TEAM || '').split(/[,;\s]+/));
-  if (!isTest_(cfg)) {
-    log.forEach(function (r) { var s = loadStoreMap_().byWZ[r[1]]; if (s && s.dmEmail) to.push(s.dmEmail); });
-    if (cfg.EXTRA_ALERT_TO) to = to.concat(cfg.EXTRA_ALERT_TO.split(','));
-  }
-  to = to.map(function (e) { return String(e).trim().toLowerCase(); }).filter(function (e, i, a) { return e && a.indexOf(e) === i; });
+  var uniq = function (l) { return l.join(',').split(/[,;\s]+/).map(function (e) { return e.trim().toLowerCase(); }).filter(function (e, i, a) { return /@/.test(e) && a.indexOf(e) === i; }); };
+  var smap = loadStoreMap_(), dms = [];
+  log.forEach(function (r) { var s = smap.byWZ[r[1]]; if (s && s.dmEmail) dms.push(s.dmEmail); });
+  var live = uniq([adminEmail_(), cfg.RECON_TEAM || ''].concat(dms, [cfg.EXTRA_ALERT_TO || '']));
+  var to = isTest_(cfg) ? uniq([adminEmail_(), cfg.RECON_TEAM || '']) : live;
+  if (isTest_(cfg)) html = html.replace('TEST MODE — this alert went to the admin only.</p>',
+    'TEST MODE — this alert went to the admin only.<br><span style="font-size:12px">When live it goes to ' + live.length + ' people: ' + live.join(', ') + '</span></p>');
   MailApp.sendEmail({ to: to.join(','), subject: subj, htmlBody: html });
   logRun('Alert sent for ' + bizDate + ' to ' + to.join(','));
   try { sendStoreAlerts_(bizDate, log, cfg, day, money); } catch (e) { logRun('Store-manager alerts failed: ' + e); }
