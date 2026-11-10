@@ -275,6 +275,53 @@ h3{font-size:15px;margin:0;font-weight:650}
   .cal-d{aspect-ratio:auto;min-height:48px;padding:4px}
   .cal-d small{font-size:9px}
 }
+/* ---------- v3: To do / DM board / Heatmap ---------- */
+.prog{height:6px;border-radius:3px;background:var(--fill);overflow:hidden}.prog i{display:block;height:100%;background:var(--green);border-radius:3px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{border:0;background:var(--surface);color:var(--fg);border-radius:999px;padding:7px 12px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;min-height:34px;display:inline-flex;gap:6px;align-items:center}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.chip .n{font-variant-numeric:tabular-nums;opacity:.7}
+.todo{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+.tlist{background:var(--surface);border-radius:var(--r-lg);overflow:hidden}
+.tlist-h{padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.ti{display:flex;width:100%;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;border:0;border-top:1px solid var(--sep);background:none;text-align:left;font:inherit;color:inherit;cursor:pointer;min-height:62px}
+.ti:first-of-type{border-top:0}.ti:hover{background:var(--surface-2)}
+.ti.sel{background:color-mix(in srgb,var(--accent) 10%,var(--surface));box-shadow:inset 3px 0 0 var(--accent)}
+.ti-l{display:flex;flex-direction:column;gap:3px;min-width:0}.ti-l b{font-size:15px}
+.ti-l small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ti-r{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none}.ti-r b{font-size:15px}
+.rep{color:var(--red);font-weight:600}
+.pane{display:none}
+.kbd{font-size:12px;color:var(--muted)}.kbd kbd{font:inherit;font-weight:600;background:var(--fill);border-radius:5px;padding:1px 6px}
+@media (min-width:1000px){
+  .todo{grid-template-columns:minmax(300px,390px) minmax(0,1fr)}
+  .pane{display:flex;flex-direction:column;border:1px solid var(--sep);border-radius:var(--r-lg);position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto;background:var(--bg)}
+  .pane .sh-body{overflow:visible}
+  .pane [data-close]{display:none}
+  .pane .suggest{font-size:14px;padding:14px;border:1px solid color-mix(in srgb,var(--green) 35%,transparent)}
+  .pane .suggest::before{content:"Suggested fix";display:block;width:100%;font-weight:700;color:var(--green);font-size:12px;letter-spacing:.03em;text-transform:uppercase}
+}
+.dmgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.dmc{background:var(--surface);border-radius:var(--r-lg);padding:16px;display:flex;flex-direction:column;gap:12px;border-top:4px solid var(--c,var(--green))}
+.dmc-h{display:flex;align-items:center;gap:12px}
+.av{width:40px;height:40px;border-radius:20px;background:var(--fill);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none}
+.dmc-n{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.dmc-n b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dmc-n small{font-size:12px;color:var(--muted)}
+.dmc-a{display:flex;flex-direction:column;align-items:flex-end}.dmc-a b{font-size:18px}.dmc-a small{font-size:11px;color:var(--muted)}
+.schips{display:flex;flex-wrap:wrap;gap:6px}
+.sc{border:0;font:inherit;font-size:12px;font-weight:600;padding:5px 8px;border-radius:7px;cursor:pointer;background:color-mix(in srgb,var(--k) 16%,var(--surface));color:color-mix(in srgb,var(--k) 75%,var(--fg))}
+.sc.clean{cursor:default}
+.dmc-f{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--sep);padding-top:10px;font-size:13px;color:var(--muted)}
+.heat{background:var(--surface);border-radius:var(--r-lg);overflow-x:auto}
+.heat table{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
+.heat th{font-size:12px;font-weight:600;color:var(--muted);text-align:center;padding:10px 4px;position:sticky;top:0;background:var(--surface)}
+.heat th:first-child,.heat td:first-child{text-align:left;padding-left:14px;position:sticky;left:0;background:var(--surface);z-index:1}
+.heat td{padding:3px;border-top:1px solid var(--sep)}
+.heat td.st b{display:block;font-size:14px}.heat td.st small{color:var(--muted);font-size:11px}
+.heat td.amt{text-align:right;padding-right:14px;font-weight:700;white-space:nowrap}
+.hc{width:100%;min-width:46px;height:34px;border:0;border-radius:7px;font:inherit;font-size:11px;font-weight:600;cursor:pointer;background:color-mix(in srgb,var(--k) 22%,var(--surface));color:color-mix(in srgb,var(--k) 70%,var(--fg))}
+.hc.solid{background:var(--k);color:#fff}
+.hc.none{background:var(--fill);color:var(--faint);cursor:default}
+.hlegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.hlegend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px}
 @media (prefers-reduced-motion:reduce){.sheet,.scrim,.toast{transition:none}}
 </style>
 </head>
@@ -318,10 +365,12 @@ const IC = {
   safe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5V7M15.5 12H17M7 20v1.5M17 20v1.5"/></svg>',
   score:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>',
   export:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>',
+  todo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5l2 2 3.5-3.5M4 15.5l2 2 3.5-3.5M13 7h7M13 16h7"/></svg>',
+  grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>',
   search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>'
 };
 
-const S = { token:null, me:null, boot:null, days:{}, staleDays:{}, view:"day", date:null, filter:"open", q:"", dm:"", co:"", sel:null, store:null, users:null, loading:false, err:null };
+const S = { token:null, me:null, boot:null, days:{}, staleDays:{}, view:"todo", date:null, filter:"open", q:"", dm:"", co:"", sel:null, store:null, users:null, loading:false, err:null };
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money = (n,sign) => { n=Number(n)||0; const s=Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); return (n<0?"−$":(sign&&n>0?"+$":"$"))+s; };
@@ -450,7 +499,8 @@ async function loadDay(d,force){
 /* ---------- shell ---------- */
 function navItems(){
   const b=S.boot, open=(b&&b.carry?b.carry.length:0);
-  const it=[["day","Daily recon",IC.day,"var(--accent)",""],["open","Still open",IC.open,"var(--red)",open?String(open):""],["safe","Safe tracker",IC.safe,"var(--orange)",""],
+  const td=b&&S.date?(b.days.find(d=>d.date===S.date)||{}).open:0;
+  const it=[["todo","To do",IC.todo,"var(--red)",td?String(td):""],["day","Daily recon",IC.day,"var(--accent)",""],["dms","DM board",IC.team,"var(--indigo)",""],["heat","Heatmap",IC.grid,"var(--orange)",""],["open","Still open",IC.open,"var(--red)",open?String(open):""],["safe","Safe tracker",IC.safe,"var(--orange)",""],
     ["score","Scorecard",IC.score,"var(--purple)",""],["cal","Store calendar",IC.day,"var(--teal)",""],["stores","Stores",IC.store,"var(--green)",b?String(b.stores.length):""],["export","Export",IC.export,"var(--faint)",""]];
   if(S.me&&S.me.isAdmin) it.push(["team","People & access",IC.team,"var(--indigo)",b&&b.pendingRequests?String(b.pendingRequests):""]);
   return it;
@@ -462,7 +512,7 @@ function renderShell(){
 function renderSide(){
   const b=S.boot;
   $("side").innerHTML=`<div class="brand"><span class="nyc-logo" role="img" aria-label="NY Connection"></span><span class="brand-sub">CASH RECON DESK</span></div>
-  <div><nav class="nav">${navItems().map(([k,l,ic,c,n])=>`<button data-view="${k}" ${S.view===k?'aria-current="page"':""}><span class="ico" style="background:${c}">${ic}</span><span class="lbl">${l}</span><span class="cnt ${(k==="open"||k==="team")&&n?"bad":""}">${n}</span></button>`).join("")}</nav></div>
+  <div><nav class="nav">${navItems().map(([k,l,ic,c,n])=>`<button data-view="${k}" ${S.view===k?'aria-current="page"':""}><span class="ico" style="background:${c}">${ic}</span><span class="lbl">${l}</span><span class="cnt ${(k==="open"||k==="team"||k==="todo")&&n?"bad":""}">${n}</span></button>`).join("")}</nav></div>
   ${b&&b.days.length?`<div><div class="nav-h">RECENT DAYS</div><nav class="nav">${b.days.slice(0,10).map(d=>`<button data-day="${d.date}" ${S.view==="day"&&S.date===d.date?'aria-current="page"':""}><span class="lbl">${dayLabel(d.date)}</span><span class="cnt ${d.open?"bad":""}">${d.open?d.open+" open":"✓"}</span></button>`).join("")}</nav></div>`:""}
   <div class="side-foot"><div><b style="color:var(--fg)">${esc(S.me&&S.me.name||"")}</b><br>${esc(S.me&&S.me.role||"")}</div>
   ${b&&b.lastRun&&b.lastRun.at?`<div>Last engine run ${new Date(b.lastRun.at).toLocaleString("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"})}</div>`:""}
@@ -479,13 +529,13 @@ function mbar(){
   return `<div class="mbar"><button class="mmenu" id="mmenu" aria-haspopup="dialog">${MENU_IC}Menu</button>${n&&S.view!=="open"?`<button class="mopen" data-mview="open" aria-label="${n} still open">Still open <span class="badge">${n}</span></button>`:""}</div>`;
 }
 /* Mobile menu: a sheet styled like iPhone Settings (grouped rows, colored icons). */
-function openMenu(){
+function openMenu(){ menuMode=true;
   const b=S.boot, me=S.me||{}, items=navItems();
   const ini=String(me.name||me.email||"?").split(/[\s.@]+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join("");
   const day=b&&S.date?(b.days.find(d=>d.date===S.date)||null):null;
-  const det=(k,n)=>k==="open"&&n?`<span class="badge">${n}</span>`:k==="day"&&day?(day.open?day.open+" open":"All matched"):n?esc(n):"";
+  const det=(k,n)=>(k==="open"||k==="todo")&&n?`<span class="badge">${n}</span>`:k==="day"&&day?(day.open?day.open+" open":"All matched"):n?esc(n):"";
   const row=([k,l,ic,c,n])=>`<button class="mrow" data-mgo="${k}" ${S.view===k?'aria-current="page"':""}><span class="ico" style="background:${c}">${ic}</span><span class="in"><span>${l}</span><span class="mdet">${det(k,n)}${S.view===k?`<span class="chk">${CHECK_IC}</span>`:""}</span></span></button>`;
-  const main=items.filter(i=>["day","open","safe","score","cal","stores"].includes(i[0])), more=items.filter(i=>["export","team"].includes(i[0]));
+  const main=items.filter(i=>["todo","day","dms","heat","open","safe","score","cal","stores"].includes(i[0])), more=items.filter(i=>["export","team"].includes(i[0]));
   const days=b?b.days.slice(0,5):[];
   openSheet(`<div class="msh" role="dialog" aria-label="Menu" style="display:contents"><div class="mgrab" aria-hidden="true"></div>
     <div class="sh-head"><span style="width:52px"></span><b style="font-size:17px">Cash Recon</b><button class="btn-link" data-close style="width:52px;text-align:right;color:var(--accent);font-weight:600;font-size:17px;min-height:44px">Done</button></div>
@@ -504,14 +554,15 @@ function openMenu(){
 }
 function go(v){ S.view=v; render(); window.scrollTo(0,0);
   if(v==="team"){ if(!S.users) loadUsers(); loadReqs(); }
-  if(v==="safe") loadSafe(); if(v==="score"&&!S.scoreData) loadScore(); if(v==="cal"&&!S.calData) loadCal(); }
+  if(v==="safe") loadSafe(); if(v==="score"&&!S.scoreData) loadScore(); if(v==="cal"&&!S.calData) loadCal();
+  if(v==="dms"&&S.dmN===7) loadDmRange(); if(v==="heat") loadHeat(); }
 
 function render(){
   if(!S.token){ renderLogin(); return; }
   renderShell(); if(!S.boot) return; renderSide();
   const m=$("main");
   m.innerHTML=`<div class="wrap">${mbar()}${S.boot.testMode&&S.me.isAdmin?`<div class="banner"><b>Test mode is on.</b> The daily alert email only goes to the admin + recon team. DMs aren't emailed yet.</div>`:""}${
-    ({day:viewDay,open:viewOpen,stores:viewStores,team:viewPeople,safe:viewSafe,score:viewScore,cal:viewCal,export:viewExport}[S.view]||viewDay)()}</div>`;
+    ({todo:viewTodo,dms:viewDms,heat:viewHeat,day:viewDay,open:viewOpen,stores:viewStores,team:viewPeople,safe:viewSafe,score:viewScore,cal:viewCal,export:viewExport}[S.view]||viewDay)()}</div>`;
   m.querySelectorAll("[data-mview]").forEach(x=>x.onclick=()=>go(x.dataset.mview));
   const mm=$("mmenu"); if(mm) mm.onclick=openMenu;
   bindView();
@@ -650,14 +701,19 @@ function userSheet(x){
 }
 
 /* ---------- detail sheet ---------- */
-function openSheet(html){ const s=$("sheet"); s.innerHTML=html; s.classList.add("on"); $("scrim").classList.add("on"); s.querySelectorAll("[data-close]").forEach(x=>x.onclick=closeSheet); }
-function closeSheet(){ $("sheet").classList.remove("on"); $("scrim").classList.remove("on"); if(S.sel){ S.sel=null; document.querySelectorAll(".tr.sel").forEach(x=>x.classList.remove("sel")); } }
+let menuMode=false;
+const wide=()=>window.matchMedia("(min-width:1000px)").matches;
+const inPane=()=>!menuMode&&S.view==="todo"&&wide()&&!!$("pane");
+function sheetEl(){ return inPane()?$("pane"):$("sheet"); }
+function openSheet(html){ if(inPane()){ const p=$("pane"); p.innerHTML=html; return; } menuMode=false; const s=$("sheet"); s.innerHTML=html; s.classList.add("on"); $("scrim").classList.add("on"); s.querySelectorAll("[data-close]").forEach(x=>x.onclick=closeSheet); }
+function closeSheet(){ menuMode=false; $("sheet").classList.remove("on"); $("scrim").classList.remove("on"); if(S.sel){ S.sel=null; document.querySelectorAll(".tr.sel").forEach(x=>x.classList.remove("sel")); } }
 $("scrim").onclick=closeSheet; document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
 
 async function rowSheet(date,wz){
-  let day=S.days[date]; if(!day){ await loadDay(date); day=S.days[date]; }
+  let day=S.days[date]; if(!day){ const x=await api("day",{date}); if(x.ok){ S.days[date]=x; delete S.staleDays[date]; } day=S.days[date]; }
   const r=(day&&day.rows||[]).find(x=>x.wz===wz) || (S.boot.carry||[]).find(x=>x.wz===wz&&x.date===date); if(!r) return;
   S.sel={date,wz}; document.querySelectorAll(".tr").forEach(x=>x.classList.toggle("sel",x.dataset.row===date+"|"+wz));
+  document.querySelectorAll(".ti").forEach(x=>{ const on=x.dataset.trow===date+"|"+wz; x.classList.toggle("sel",on); if(on&&inPane()) x.scrollIntoView({block:"nearest"}); });
   const bags=(day&&day.bags[wz])||[], cash=(day&&day.cash[wz])||[], can=S.me.canEdit&&!isLocked(date);
   const fmtT=t=>typeof t==="number"?new Date(t).toLocaleString("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"}):esc(t);
   openSheet(`<div class="sh-head"><div><div class="eyebrow">${dayLabel(date,true).toUpperCase()}</div><h2 id="sh-t">${esc(r.store)}</h2></div><button class="iconbtn" data-close aria-label="Close">${IC.x}</button></div>
@@ -702,7 +758,7 @@ async function rowSheet(date,wz){
   if(ab&&hr&&hr.ok&&S.sel&&S.sel.wz===wz&&S.sel.date===date){ ab.innerHTML=allocHtml(r,hr.rows,hr.allocs); bindAlloc(r); }
 }
 async function histInto(wz,date){
-  const r=await api("store",{wz,days:30}); const box=$("h-box"); if(!box) return r;
+  S.hcache=S.hcache||{}; const r=S.hcache[wz]||await api("store",{wz,days:30}); if(r.ok) S.hcache[wz]=r; const box=$("h-box"); if(!box) return r;
   if(!r.ok){ box.innerHTML=`<span class="muted">${esc(errText(r))}</span>`; return r; }
   const rows=r.rows.slice().reverse(), mx=Math.max(1,...rows.map(x=>Math.abs(x.finalDiff)));
   const open=r.rows.filter(isOpen).length;
@@ -741,7 +797,7 @@ async function getRange(from,to){
   const c=r.cols; r.list=r.rows.map(a=>{ const o={}; c.forEach((k,i)=>o[k]=a[i]); return o; });
   S.range[k]=r; return r;
 }
-function dropCaches(){ S.range={}; S.safe=null; }
+function dropCaches(){ S.range={}; S.safe=null; S.hcache={}; S.heatData=null; S.dmData=null; }
 
 /* ---------- Close / reopen day ---------- */
 function lockBar(){
@@ -786,7 +842,7 @@ function allocHtml(r, hist, allocs){
   return h;
 }
 function bindAlloc(r){
-  const sheet=$("sheet");
+  const sheet=sheetEl();
   sheet.querySelectorAll("[data-undo]").forEach(b=>b.onclick=async()=>{ b.disabled=true; const x=await api("undoAlloc",{id:b.dataset.undo}); if(!x.ok){ toast(errText(x)); b.disabled=false; return; } await afterEdit(r,"Undone"); });
   const am=$("applymatch"); if(am) am.onclick=async()=>{ am.disabled=true; const x=await api("allocate",{wz:r.wz,depDate:r.date,days:am.dataset.days.split(","),kind:"match"}); if(!x.ok){ toast(errText(x)); am.disabled=false; return; } await afterEdit(r,`Matched ${money(x.moved)}`); };
   const cf=$("cf"); if(cf) cf.onsubmit=async ev=>{ ev.preventDefault(); const days=[...cf.querySelectorAll("input[type=checkbox]:checked")].map(i=>i.value), reason=$("c-r").value;
@@ -1011,11 +1067,162 @@ function renderRequest(){
 }
 
 /* ---------- bindings ---------- */
+/* ================= v3: To do · DM board · Heatmap ================= */
+const KIND={missing:["Missing","var(--red)",5],short:["Short","var(--orange)",4],over:["Over","var(--purple)",3],bonly:["No cashout","var(--teal)",2],late:["Late","var(--accent)",1],ok:["Matched","var(--green)",0],none:["—","var(--faint)",-1]};
+function kindOf(r){
+  if(!r||r.status==="NO ACTIVITY") return "none";
+  const fs=String(r.finalStatus||r.status), ar=String(r.adjReason||"");
+  if(/RESOLVED/.test(fs)) return (/late drop/.test(fs)||(/Combined deposit/.test(ar)&&!EXCUSED.some(e=>ar.includes(e))))?"late":"ok";
+  return {"MISSING DEPOSIT":"missing","SHORT":"short","OVER":"over","BRINKS ONLY":"bonly"}[baseStatus(r)]||"ok";
+}
+const short$=n=>"$"+Math.round(Math.abs(n)).toLocaleString("en-US");
+const initials=s=>String(s||"?").split(/[\s/]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join("");
+function dmOptions(){ return [...new Set(S.boot.stores.map(s=>String(s.dm).trim()).filter(Boolean))].sort(); }
+function dmPick(){ const d=dmOptions(); return d.length>1?`<select class="pick" id="fdm" aria-label="DM"><option value="">All DMs</option>${d.map(x=>`<option ${S.dm===x?"selected":""}>${esc(x)}</option>`).join("")}</select>`:""; }
+function dayNav(){
+  const b=S.boot, i=b.days.findIndex(x=>x.date===S.date);
+  return `<div class="daynav"><button class="iconbtn" id="dprev" ${i>=b.days.length-1?"disabled":""} aria-label="Previous day">${IC.prev}</button>
+    <select class="datesel" id="dsel" aria-label="Pick a day">${b.days.map(d=>`<option value="${d.date}" ${d.date===S.date?"selected":""}>${dayLabel(d.date)}${d.open?` · ${d.open} open`:""}</option>`).join("")}</select>
+    <button class="iconbtn" id="dnext" ${i<=0?"disabled":""} aria-label="Next day">${IC.next}</button></div>`;
+}
+
+/* ---------- A · To do (triage inbox) ---------- */
+const TODO_F=[["today","Today"],["missing","Missing"],["short","Short"],["over","Over"],["bonly","No cashout"],["older","Older days"]];
+function todoItems(){
+  const data=S.days[S.date], rows=data?data.rows:[], carry=(S.boot.carry||[]).filter(r=>r.date!==S.date);
+  const dmOk=r=>!S.dm||String(r.dm).trim()===S.dm;
+  const today=rows.filter(r=>isOpen(r)&&dmOk(r)), older=carry.filter(r=>isOpen(r)&&dmOk(r));
+  const f=S.todoF||"today", k=kindOf;
+  let list=f==="older"?older:f==="today"?today:today.filter(r=>k(r)===f);
+  list=list.slice().sort((a,b)=>Math.abs(b.finalDiff)-Math.abs(a.finalDiff)||a.store.localeCompare(b.store));
+  return {today,older,list,loaded:!!data};
+}
+function viewTodo(){
+  const b=S.boot, sum=b.days.find(x=>x.date===S.date);
+  if(!sum) return `<div class="empty"><b>No recon yet</b>The first day shows up after the morning run.</div>`;
+  const {today,older,list,loaded}=todoItems(), f=S.todoF||"today";
+  const rep={}; [...(b.carry||[]),...today].forEach(r=>(rep[r.wz]=rep[r.wz]||new Set()).add(r.date));
+  const amt=today.reduce((t,r)=>t+Math.abs(r.finalDiff),0), pct=Math.round(sum.matched/Math.max(1,sum.total)*100);
+  const cnt=k=>k==="today"?today.length:k==="older"?older.length:today.filter(r=>kindOf(r)===k).length;
+  S.todoList=list.map(r=>[r.date,r.wz]);
+  const item=r=>{ const n=rep[r.wz]?rep[r.wz].size:0;
+    return `<button class="ti ${S.sel&&S.sel.wz===r.wz&&S.sel.date===r.date?"sel":""}" data-trow="${r.date}|${r.wz}">
+      <span class="ti-l"><b>${esc(r.store)}</b><small>${f==="older"?esc(dayLabel(r.date))+" · ":""}${esc(r.wz)} · ${esc(r.dm||"No DM")}${n>1?` · <span class="rep">${n} open days</span>`:""}</small></span>
+      <span class="ti-r"><b class="num ${r.finalDiff<0?"neg":"pos"}">${money(r.finalDiff,1)}</b>${pill(r)}</span></button>`; };
+  return `<div class="top"><div><div class="eyebrow">TO DO · ${esc(dayLabel(S.date,true).toUpperCase())}</div>
+      <h1>${!loaded?"Loading…":today.length?`${today.length} store${today.length===1?"":"s"} need you`:"All clear"}</h1>
+      <p class="sub">${today.length?`<b style="color:var(--red)">${money(amt)} open</b> · `:""}${sum.matched} of ${sum.total} reconciled${older.length?` · ${older.length} older item${older.length===1?"":"s"} still open`:""}${S.dm?` · DM <b>${esc(S.dm)}</b>`:""}</p></div>
+    ${dayNav()}</div>
+  <div class="prog" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Stores reconciled"><i style="width:${pct}%"></i></div>
+  ${lockBar()}
+  <div class="toolbar"><div class="chips" role="group" aria-label="Filter">${TODO_F.map(([k,l])=>`<button class="chip" data-tf="${k}" aria-pressed="${f===k}">${l} <span class="n">${cnt(k)}</span></button>`).join("")}</div>
+    ${dmPick()}${S.dm?`<button class="btn" id="dmclear">Clear DM</button>`:""}</div>
+  <div class="todo">
+    <div class="tlist">${!loaded?`<div class="empty"><b>Loading ${dayLabel(S.date)}…</b></div>`:list.length?list.map(item).join(""):
+      `<div class="empty"><b>${f==="today"?"Nothing open":"Nothing here"}</b>${f==="today"?"Every store reconciled for this day. Close the day above.":"Try another filter."}</div>`}</div>
+    <section class="pane" id="pane" aria-label="Store detail">${list.length?"":`<div class="empty"><b>Pick a store</b></div>`}</section>
+  </div>
+  ${list.length?`<p class="kbd" style="margin:0 4px"><kbd>J</kbd> / <kbd>K</kbd> next / previous · <kbd>A</kbd> apply suggested fix · tap the DM board to filter by DM</p>`:""}`;
+}
+function todoMove(step){
+  const L=S.todoList||[]; if(!L.length) return;
+  let i=S.sel?L.findIndex(x=>x[0]===S.sel.date&&x[1]===S.sel.wz):-1; i=Math.max(0,Math.min(L.length-1,i+step));
+  rowSheet(L[i][0],L[i][1]);
+}
+function bindTodo(){
+  const m=$("main");
+  m.querySelectorAll("[data-tf]").forEach(x=>x.onclick=()=>{ S.todoF=x.dataset.tf; S.sel=null; render(); });
+  m.querySelectorAll("[data-trow]").forEach(x=>x.onclick=()=>{ const [d,w]=x.dataset.trow.split("|"); rowSheet(d,w); });
+  const c=$("dmclear"); if(c) c.onclick=()=>{ S.dm=""; S.sel=null; render(); };
+  if(wide()&&S.todoList&&S.todoList.length){
+    const L=S.todoList, keep=S.sel&&L.find(x=>x[0]===S.sel.date&&x[1]===S.sel.wz), t=keep||L[0];
+    rowSheet(t[0],t[1]);
+  }
+}
+document.addEventListener("keydown",e=>{
+  if(S.view!=="todo"||e.metaKey||e.ctrlKey||e.altKey) return;
+  const a=document.activeElement; if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+  if(e.key==="j"||e.key==="ArrowDown"){ e.preventDefault(); todoMove(1); }
+  else if(e.key==="k"||e.key==="ArrowUp"){ e.preventDefault(); todoMove(-1); }
+  else if(e.key==="a"){ const b=$("applymatch"); if(b&&!b.disabled){ e.preventDefault(); b.click(); } }
+});
+
+/* ---------- B · DM board ---------- */
+async function loadDmRange(){
+  const d=S.boot.days.slice(0,7).map(x=>x.date); if(!d.length) return;
+  const r=await getRange(d[d.length-1],d[0]); if(r){ S.dmData=r; if(S.view==="dms") render(); }
+}
+function viewDms(){
+  const n=S.dmN||1, seven=n===7;
+  const head=`<div class="top"><div><div class="eyebrow">${seven?"LAST 7 BUSINESS DAYS":esc(dayLabel(S.date,true).toUpperCase())} · ${S.boot.stores.length} STORES</div><h1>Who needs a call</h1>
+    <p class="sub">Each card is one DM. Worst districts first. Tap a store to open it, or <b>Open list</b> for that DM's To do.</p></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="seg">${[[1,"One day"],[7,"Last 7 days"]].map(([k,l])=>`<button data-dmn="${k}" aria-pressed="${n===k}">${l}</button>`).join("")}</div>${seven?"":dayNav()}</div></div>`;
+  const rows=seven?(S.dmData?S.dmData.list:null):(S.days[S.date]?S.days[S.date].rows:null);
+  if(!rows) return head+`<div class="empty"><b>Loading…</b></div>`;
+  const by={};
+  rows.forEach(r=>{ const dm=String(r.dm).trim()||"No DM", g=by[dm]=by[dm]||{dm,stores:{},amt:0,open:0};
+    const s=g.stores[r.wz]=g.stores[r.wz]||{wz:r.wz,name:r.store,kind:"none",amt:0,open:0,date:r.date,worst:null};
+    const k=kindOf(r); if(KIND[k][2]>KIND[s.kind][2]) s.kind=k;
+    if(isOpen(r)){ s.open++; s.amt+=Math.abs(r.finalDiff); g.open++; g.amt+=Math.abs(r.finalDiff); if(!s.worst||Math.abs(r.finalDiff)>Math.abs(s.worst.finalDiff)) s.worst=r; }
+    if(!seven) s.date=r.date; });
+  const groups=Object.values(by).map(g=>{ g.list=Object.values(g.stores).sort((a,b)=>KIND[b.kind][2]-KIND[a.kind][2]||b.amt-a.amt); g.bad=g.list.filter(s=>s.open).length; return g; })
+    .sort((a,b)=>b.amt-a.amt||b.bad-a.bad||a.dm.localeCompare(b.dm));
+  const card=g=>{ const bad=g.list.filter(s=>s.open), clean=g.list.filter(s=>!s.open), w=bad[0];
+    const band=g.bad>=3?"var(--red)":g.bad?"var(--orange)":"var(--green)";
+    const line=w?`${esc(w.name)}: ${KIND[w.kind][0].toLowerCase()} ${short$(w.worst?w.worst.finalDiff:w.amt)}${seven&&w.open>1?` · ${w.open} days`:""}`:"All clean";
+    const chip=s=>`<button class="sc" style="--k:${KIND[s.kind][1]}" ${seven||!s.worst?`data-store="${s.wz}"`:`data-row="${s.worst.date}|${s.wz}"`} title="${esc(s.name)} · ${KIND[s.kind][0]}${s.open?` · ${money(s.amt)} open`:""}">${esc(s.name)}${seven&&s.open>1?` ×${s.open}`:""}</button>`;
+    return `<article class="dmc" style="--c:${band}"><div class="dmc-h"><span class="av">${esc(initials(g.dm))}</span>
+      <span class="dmc-n"><b title="${esc(g.dm)}">${esc(g.dm)}</b><small>${g.list.length} store${g.list.length===1?"":"s"} · ${g.bad?`${g.bad} with issues`:"no issues"}</small></span>
+      <span class="dmc-a"><b class="num" style="color:${g.amt?"var(--red)":"var(--green)"}">${short$(g.amt)}</b><small>open</small></span></div>
+      <div class="schips">${bad.map(chip).join("")}${clean.length?(bad.length?`<span class="sc clean" style="--k:var(--green)">+${clean.length} clean</span>`:clean.map(chip).join("")):""}</div>
+      <div class="dmc-f"><span>${line}</span>${g.bad?`<button class="btn" data-dmgo="${esc(g.dm)}">Open list →</button>`:""}</div></article>`; };
+  const tot=groups.reduce((t,g)=>t+g.amt,0), nb=groups.filter(g=>g.bad).length;
+  return head+`<p class="sub" style="margin:0 4px">${nb} of ${groups.length} DMs have something open · ${money(tot)} total</p>
+  <div class="dmgrid">${groups.map(card).join("")}</div>
+  <div class="hlegend">${["missing","short","over","bonly","late","ok"].map(k=>`<span><i style="background:${KIND[k][1]}"></i>${KIND[k][0]}</span>`).join("")}</div>`;
+}
+
+/* ---------- C · Store × day heatmap ---------- */
+async function loadHeat(){
+  const n=S.heatN||7, d=S.boot.days.slice(0,n).map(x=>x.date); if(!d.length) return;
+  const k=d[d.length-1]+"|"+d[0]; if(S.heatData&&S.heatData.k===k) return;
+  const r=await getRange(d[d.length-1],d[0]); if(r){ S.heatData={k,days:d.slice().reverse(),r}; if(S.view==="heat") render(); }
+}
+function viewHeat(){
+  const n=S.heatN||7, all=!!S.heatAll, H=S.heatData;
+  const head=`<div class="top"><div><div class="eyebrow">LAST ${n} BUSINESS DAYS · WORST FIRST</div><h1>Every store, every day</h1>
+    <p class="sub">Red = no deposit. Tap any square to open that store-day.</p></div>
+    <div class="toolbar" style="margin:0"><div class="seg">${[7,14].map(k=>`<button data-hn="${k}" aria-pressed="${n===k}">${k} days</button>`).join("")}</div>
+    <div class="seg">${[[0,"With issues"],[1,"All stores"]].map(([k,l])=>`<button data-hall="${k}" aria-pressed="${all===!!k}">${l}</button>`).join("")}</div>${dmPick()}</div></div>`;
+  if(!H||H.days.length!==Math.min(n,S.boot.days.length)) return head+`<div class="heat"><div class="empty"><b>Loading…</b></div></div>`;
+  const by={}; H.r.list.forEach(r=>{ if(S.dm&&String(r.dm).trim()!==S.dm) return; const s=by[r.wz]=by[r.wz]||{wz:r.wz,name:r.store,dm:r.dm,d:{},open:0,amt:0,late:0};
+    s.d[r.date]=r; if(isOpen(r)){ s.open++; s.amt+=Math.abs(r.finalDiff); } else if(kindOf(r)==="late") s.late++; });
+  let rows=Object.values(by); if(!all) rows=rows.filter(s=>s.open||s.late);
+  rows.sort((a,b)=>b.open-a.open||b.amt-a.amt||b.late-a.late||a.name.localeCompare(b.name));
+  const lab=d=>{ const x=new Date(d+"T12:00:00"); return x.toLocaleDateString("en-US",{weekday:"short"})+" "+x.getDate(); };
+  const cell=(s,d)=>{ const r=s.d[d], k=kindOf(r);
+    if(k==="none") return `<td><span class="hc none" style="display:flex;align-items:center;justify-content:center" title="${r?"No activity":"No row"}">—</span></td>`;
+    const solid=k==="missing"; return `<td><button class="hc ${solid?"solid":""}" style="--k:${KIND[k][1]}" data-row="${d}|${s.wz}" title="${esc(s.name)} · ${dayLabel(d)} · ${KIND[k][0]}${isOpen(r)?` ${money(r.finalDiff,1)}`:""}">${k==="ok"?"":KIND[k][0]}</button></td>`; };
+  return head+`<div class="heat"><table><thead><tr><th>Store</th>${H.days.map(d=>`<th>${lab(d)}</th>`).join("")}<th style="text-align:right;padding-right:14px">Open $</th></tr></thead>
+    <tbody>${rows.map(s=>`<tr><td class="st"><b>${esc(s.name)}</b><small>${esc(s.wz)} · ${esc(String(s.dm).split(/[\/,]/)[0])}</small></td>${H.days.map(d=>cell(s,d)).join("")}
+      <td class="amt num" style="color:${s.amt?"var(--red)":"var(--green)"}">${short$(s.amt)}</td></tr>`).join("")||`<tr><td colspan="${H.days.length+2}"><div class="empty"><b>Clean sheet</b>No open or late days in this window.</div></td></tr>`}</tbody></table></div>
+  <div class="hlegend">${["ok","missing","short","over","bonly","late"].map(k=>`<span><i style="background:${k==="missing"?KIND[k][1]:`color-mix(in srgb,${KIND[k][1]} 30%,var(--surface))`}"></i>${k==="late"?"Late (cleared)":KIND[k][0]}</span>`).join("")}<span><i style="background:var(--fill)"></i>No cash / no audit</span><span>${rows.length} store${rows.length===1?"":"s"} shown</span></div>`;
+}
+function bindV3(){
+  const m=$("main");
+  m.querySelectorAll("[data-dmn]").forEach(x=>x.onclick=()=>{ S.dmN=Number(x.dataset.dmn); render(); if(S.dmN===7&&!S.dmData) loadDmRange(); });
+  m.querySelectorAll("[data-dmgo]").forEach(x=>x.onclick=()=>{ S.dm=x.dataset.dmgo; S.todoF="today"; S.sel=null; go("todo"); });
+  m.querySelectorAll("[data-hn]").forEach(x=>x.onclick=()=>{ S.heatN=Number(x.dataset.hn); render(); loadHeat(); });
+  m.querySelectorAll("[data-hall]").forEach(x=>x.onclick=()=>{ S.heatAll=x.dataset.hall==="1"; render(); });
+  if(S.view==="todo") bindTodo();
+  if(S.view==="heat"&&!S.heatData) loadHeat();
+  if(S.view==="dms"&&S.dmN===7&&!S.dmData) loadDmRange();
+}
 function bindView(){
   const m=$("main");
   m.querySelectorAll("[data-f]").forEach(x=>x.onclick=()=>{ S.filter=x.dataset.f; render(); });
   const q=$("q"); if(q) q.oninput=()=>{ S.q=q.value; const p=q.selectionStart; render(); const n=$("q"); n.focus(); n.setSelectionRange(p,p); };
-  const fdm=$("fdm"); if(fdm) fdm.onchange=()=>{ S.dm=fdm.value; render(); };
+  const fdm=$("fdm"); if(fdm) fdm.onchange=()=>{ S.dm=fdm.value; S.sel=null; render(); };
   const fco=$("fco"); if(fco) fco.onchange=()=>{ S.co=fco.value; render(); };
   const ds=$("dsel"); if(ds) ds.onchange=()=>loadDay(ds.value);
   const i=S.boot.days.findIndex(x=>x.date===S.date);
@@ -1040,6 +1247,7 @@ function bindView(){
     xf.querySelectorAll("[data-xr]").forEach(b=>b.onclick=()=>{ readExp(); const last=S.boot.days[0]?S.boot.days[0].date:ymd(new Date()); S.exp.to=last;
       S.exp.from=b.dataset.xr==="mtd"?last.slice(0,8)+"01":addD(last,-Number(b.dataset.xr)); render(); }); }
   if(S.view==="team") bindPeople();
+  bindV3();
   if(S.view==="stores"&&S.boot.days[0]&&!S.days[S.boot.days[0].date]) loadDay(S.boot.days[0].date).then(()=>{ S.view="stores"; render(); });
 }
 
