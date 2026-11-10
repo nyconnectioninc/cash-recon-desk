@@ -322,6 +322,22 @@ h3{font-size:15px;margin:0;font-weight:650}
 .hc.solid{background:var(--k);color:#fff}
 .hc.none{background:var(--fill);color:var(--faint);cursor:default}
 .hlegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.hlegend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px}
+.sp-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+@media (min-width:1000px){.sp-grid{grid-template-columns:minmax(0,1fr) 360px}}
+.sp-aside{display:flex;flex-direction:column;gap:14px}
+.sp-days{background:var(--surface);border-radius:var(--r-lg);overflow:hidden}
+.sp-h,.sp-r{display:grid;grid-template-columns:92px minmax(0,1fr) minmax(0,1fr) 96px 118px;gap:10px;align-items:center;padding:10px 14px}
+.sp-h{font-size:12px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--sep)}
+.sp-r{width:100%;border:0;border-top:1px solid var(--sep);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;min-height:48px}
+.sp-r:first-of-type{border-top:0}.sp-r:hover{background:var(--surface-2)}
+.sp-r .bar{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
+.sp-r .bar i{height:9px;border-radius:5px;flex:none}
+.sp-r .cell-st{justify-self:end}
+@media (max-width:760px){.sp-h{display:none}.sp-r{grid-template-columns:72px minmax(0,1fr) auto;row-gap:4px}.sp-r .b-rq,.sp-r .b-br{grid-column:2}.sp-r .b-rq{grid-row:1}.sp-r .b-br{grid-row:2}.sp-r .c-d{grid-column:3;grid-row:1;text-align:right}.sp-r .cell-st{grid-column:3;grid-row:2}.sp-r>b{grid-row:1/3}}
+.fix{background:color-mix(in srgb,var(--accent) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);border-radius:var(--r-lg);padding:16px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.fix h3{margin:0;font-size:15px}
+.fix.ok{background:color-mix(in srgb,var(--green) 10%,var(--surface));border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+.backlink{border:0;background:none;color:var(--accent);font:inherit;font-weight:600;font-size:14px;cursor:pointer;padding:6px 0;align-self:flex-start}
 @media (prefers-reduced-motion:reduce){.sheet,.scrim,.toast{transition:none}}
 </style>
 </head>
@@ -562,7 +578,7 @@ function render(){
   renderShell(); if(!S.boot) return; renderSide();
   const m=$("main");
   m.innerHTML=`<div class="wrap">${mbar()}${S.boot.testMode&&S.me.isAdmin?`<div class="banner"><b>Test mode is on.</b> The daily alert email only goes to the admin + recon team. DMs aren't emailed yet.</div>`:""}${
-    ({todo:viewTodo,dms:viewDms,heat:viewHeat,day:viewDay,open:viewOpen,stores:viewStores,team:viewPeople,safe:viewSafe,score:viewScore,cal:viewCal,export:viewExport}[S.view]||viewDay)()}</div>`;
+    ({todo:viewTodo,dms:viewDms,heat:viewHeat,store:viewStorePage,day:viewDay,open:viewOpen,stores:viewStores,team:viewPeople,safe:viewSafe,score:viewScore,cal:viewCal,export:viewExport}[S.view]||viewDay)()}</div>`;
   m.querySelectorAll("[data-mview]").forEach(x=>x.onclick=()=>go(x.dataset.mview));
   const mm=$("mmenu"); if(mm) mm.onclick=openMenu;
   bindView();
@@ -718,7 +734,7 @@ async function rowSheet(date,wz){
   const fmtT=t=>typeof t==="number"?new Date(t).toLocaleString("en-US",{month:"numeric",day:"numeric",hour:"numeric",minute:"2-digit"}):esc(t);
   openSheet(`<div class="sh-head"><div><div class="eyebrow">${dayLabel(date,true).toUpperCase()}</div><h2 id="sh-t">${esc(r.store)}</h2></div><button class="iconbtn" data-close aria-label="Close">${IC.x}</button></div>
   <div class="sh-body">
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pill(r)}<span class="muted" style="font-size:13px">${esc(r.wz)} · ${esc(r.company)} · DM ${esc(r.dm)}</span></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pill(r)}<span class="muted" style="font-size:13px">${esc(r.wz)} · ${esc(r.company)} · DM ${esc(r.dm)}</span><button class="btn" id="to-sp" style="margin-left:auto">Store page →</button></div>
     <div class="kv">
       <div class="kv-row"><span class="kv-k">RQ cashout</span><span class="kv-v num">${money(r.rq)}</span></div>
       <div class="kv-row"><span class="kv-k">Brinks declared</span><span class="kv-v num">${money(r.brinks)} <span class="muted">· ${r.bags} bag${r.bags===1?"":"s"}</span></span></div>
@@ -745,6 +761,7 @@ async function rowSheet(date,wz){
       <p class="fine">Adjustment is added to the difference. If the result is within the $${S.boot.tolerance} tolerance, the store shows Resolved. The engine never overwrites these fields.</p></form>`
     :`<p class="fine">${isLocked(date)?`🔒 ${lockedMsg(date)}. Reopen the day to change it.`:"View only. Ask an editor to log adjustments."}</p>`}
   </div>`);
+  const tsp=$("to-sp"); if(tsp) tsp.onclick=()=>{ closeSheet(); openStorePage(wz); };
   if(can){
     $("af").querySelectorAll("[data-fill]").forEach(b=>b.onclick=()=>{ $("a-amt").value=b.dataset.fill; $("a-rsn").focus(); });
     $("af").onsubmit=async ev=>{ ev.preventDefault(); const btn=$("af").querySelector(".btn.primary"); btn.disabled=true; $("a-err").textContent="";
@@ -1204,9 +1221,90 @@ function viewHeat(){
     if(k==="none") return `<td><span class="hc none" style="display:flex;align-items:center;justify-content:center" title="${r?"No activity":"No row"}">—</span></td>`;
     const solid=k==="missing"; return `<td><button class="hc ${solid?"solid":""}" style="--k:${KIND[k][1]}" data-row="${d}|${s.wz}" title="${esc(s.name)} · ${dayLabel(d)} · ${KIND[k][0]}${isOpen(r)?` ${money(r.finalDiff,1)}`:""}">${k==="ok"?"":KIND[k][0]}</button></td>`; };
   return head+`<div class="heat"><table><thead><tr><th>Store</th>${H.days.map(d=>`<th>${lab(d)}</th>`).join("")}<th style="text-align:right;padding-right:14px">Open $</th></tr></thead>
-    <tbody>${rows.map(s=>`<tr><td class="st"><b>${esc(s.name)}</b><small>${esc(s.wz)} · ${esc(String(s.dm).split(/[\/,]/)[0])}</small></td>${H.days.map(d=>cell(s,d)).join("")}
+    <tbody>${rows.map(s=>`<tr><td class="st" data-store="${s.wz}" style="cursor:pointer"><b>${esc(s.name)}</b><small>${esc(s.wz)} · ${esc(String(s.dm).split(/[\/,]/)[0])}</small></td>${H.days.map(d=>cell(s,d)).join("")}
       <td class="amt num" style="color:${s.amt?"var(--red)":"var(--green)"}">${short$(s.amt)}</td></tr>`).join("")||`<tr><td colspan="${H.days.length+2}"><div class="empty"><b>Clean sheet</b>No open or late days in this window.</div></td></tr>`}</tbody></table></div>
   <div class="hlegend">${["ok","missing","short","over","bonly","late"].map(k=>`<span><i style="background:${k==="missing"?KIND[k][1]:`color-mix(in srgb,${KIND[k][1]} 30%,var(--surface))`}"></i>${k==="late"?"Late (cleared)":KIND[k][0]}</span>`).join("")}<span><i style="background:var(--fill)"></i>No cash / no audit</span><span>${rows.length} store${rows.length===1?"":"s"} shown</span></div>`;
+}
+/* ---------- D · Store page ---------- */
+function openStorePage(wz){
+  if(S.view!=="store") S.prevView=S.view;
+  S.spWz=wz; S.sp=null; closeSheet(); S.view="store"; render(); window.scrollTo(0,0);
+}
+async function loadStorePage(){
+  const wz=S.spWz, n=S.spN||14; if(!wz) return;
+  S.hcache=S.hcache||{};
+  let r=S.hcache["sp|"+wz]; if(!r){ updating(true); r=await api("store",{wz,days:60}); updating(false); if(!r.ok){ toast(errText(r)); return; } S.hcache["sp|"+wz]=r; }
+  if(S.spWz!==wz) return;
+  S.sp={wz,r}; if(S.view==="store") render();
+  // bags + drops: pull the most recent days (cached after the first time)
+  const want=S.boot.days.slice(0,7).map(d=>d.date).filter(d=>!S.days[d]);
+  if(want.length){ await Promise.all(want.map(d=>api("day",{date:d}).then(x=>{ if(x.ok){ S.days[d]=x; delete S.staleDays[d]; } }))); writeCache(); if(S.view==="store"&&S.spWz===wz) render(); }
+}
+function storeFix(rows){
+  const tol=S.boot.tolerance, open=rows.filter(isOpen);
+  if(!open.length) return {kind:"ok"};
+  const overs=open.filter(x=>x.finalDiff>tol).sort((a,b)=>a.date<b.date?1:-1);
+  for(const o of overs){
+    const cands=rows.filter(x=>x.date<o.date&&x.date>=addD(o.date,-14)&&isOpen(x)&&x.finalDiff<-tol&&!isLocked(x.date))
+      .map(x=>({date:x.date,need:Math.round(-x.finalDiff*100)/100,st:baseStatus(x)})).sort((a,b)=>a.date<b.date?-1:1);
+    const best=cands.length?bestSubset(cands,o.finalDiff,tol):null;
+    if(best&&!isLocked(o.date)) return {kind:"match",dep:o,best};
+    if(cands.length) return {kind:"combo",dep:o,cands};
+  }
+  const srt=open.slice().sort((a,b)=>a.date<b.date?-1:1), amt=open.reduce((t,x)=>t+Math.abs(x.finalDiff),0);
+  const neg=srt.filter(x=>x.finalDiff<0);
+  return {kind:"open",oldest:neg[0]||srt[0],extraOnly:!neg.length,count:open.length,amt};
+}
+function viewStorePage(){
+  const wz=S.spWz, s=S.boot.stores.find(x=>x.wz===wz)||{name:wz,wz,company:"",dm:""}, n=S.spN||14;
+  const back=`<button class="backlink" id="sp-back">← Back to ${esc(({todo:"To do",dms:"DM board",heat:"Heatmap",stores:"Stores",day:"Daily recon",open:"Still open",score:"Scorecard",cal:"Store calendar"})[S.prevView]||"To do")}</button>`;
+  const head=`${back}<div class="top"><div><div class="eyebrow">STORE · ${esc(wz)}</div><h1>${esc(s.name)}</h1>
+    <p class="sub">${esc(s.company)} · DM ${esc(s.dm||"none")} · ${s.active?"Smart safe live":"<b style='color:var(--orange)'>Safe not live yet</b>"}</p></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><div class="seg">${[14,30,60].map(k=>`<button data-spn="${k}" aria-pressed="${n===k}">${k} days</button>`).join("")}</div>
+    <select class="datesel" id="sp-pick" aria-label="Switch store">${S.boot.stores.map(x=>`<option value="${x.wz}" ${x.wz===wz?"selected":""}>${esc(x.name)} · ${x.wz}</option>`).join("")}</select></div></div>`;
+  if(!S.sp||S.sp.wz!==wz) return head+`<div class="empty"><b>Loading ${esc(s.name)}…</b></div>`;
+  const all=S.sp.r.rows, rows=all.slice(0,n), act=rows.filter(x=>x.status!=="NO ACTIVITY");
+  const rq=rows.reduce((t,x)=>t+(Number(x.rq)||0),0), br=rows.reduce((t,x)=>t+(Number(x.brinks)||0),0);
+  const open=rows.filter(isOpen), openAmt=open.reduce((t,x)=>t+Math.abs(x.finalDiff),0), ok=act.filter(x=>!isOpen(x)).length;
+  const range=rows.length?`${dayLabel(rows[rows.length-1].date).replace(/^\w+, /,"")}–${dayLabel(rows[0].date).replace(/^\w+, /,"")}`:"";
+  const t=(lab,v,meta,c)=>`<div class="tile"><span class="lab"><span class="sw" style="background:${c}"></span>${lab}</span><span class="big num">${v}</span><span class="meta">${meta}</span></div>`;
+  const mx=Math.max(1,...rows.map(x=>Math.max(Number(x.rq)||0,Number(x.brinks)||0)));
+  const bar=(v,c)=>`<i style="width:${v?Math.max(4,Math.round(v/mx*100)):0}%;max-width:60%;background:${c}"></i><span class="num">${v?money(v):"—"}</span>`;
+  const fx=storeFix(all.slice(0,30));
+  let fix="";
+  if(fx.kind==="ok") fix=`<div class="fix ok"><h3>All clear</h3><span>Every day in the last 30 is reconciled. Nothing to do here.</span></div>`;
+  else if(fx.kind==="match") fix=`<div class="fix"><h3>Suggested fix: catch-up deposit</h3><span>The extra ${money(fx.dep.finalDiff)} on <b>${dayLabel(fx.dep.date)}</b> covers ${fx.best.map(c=>`${dayLabel(c.date)} (${money(c.need)})`).join(" + ")}.</span>
+    ${S.me.canEdit?`<button class="btn primary" id="sp-match" data-dep="${fx.dep.date}" data-days="${fx.best.map(c=>c.date).join(",")}">Apply · clears ${fx.best.length} day${fx.best.length===1?"":"s"}</button>`:""}
+    <button class="btn" data-row="${fx.dep.date}|${wz}">Review ${dayLabel(fx.dep.date)} first</button></div>`;
+  else if(fx.kind==="combo") fix=`<div class="fix"><h3>Extra ${money(fx.dep.finalDiff)} on ${dayLabel(fx.dep.date)}</h3><span>It doesn't match open days exactly. Open the day to split it as one deposit covering several days.</span><button class="btn primary" data-row="${fx.dep.date}|${wz}">Split deposit</button></div>`;
+  else fix=`<div class="fix"><h3>${fx.count} open day${fx.count===1?"":"s"} · ${money(fx.amt)}</h3><span>Oldest ${fx.extraOnly?"":"shortfall "}is <b>${dayLabel(fx.oldest.date)}</b> (${esc((STATUS[baseStatus(fx.oldest)]||{}).label||"")} ${money(fx.oldest.finalDiff,1)}). ${fx.extraOnly?"Extra money with no missing day before it: check if the bag belongs to another store or the cashout wasn't entered in RQ.":"No later deposit covers it yet: call the DM or SM for the safe receipt."}</span>
+    <button class="btn primary" data-row="${fx.oldest.date}|${wz}">Open ${dayLabel(fx.oldest.date)}</button></div>`;
+  const bags=[]; S.boot.days.slice(0,7).forEach(d=>{ const x=S.days[d.date]; ((x&&x.bags[wz])||[]).forEach(g=>bags.push({...g,day:d.date})); });
+  bags.sort((a,b)=>(typeof b.created==="number"?b.created:0)-(typeof a.created==="number"?a.created:0));
+  const fmtT=g=>typeof g.created==="number"?new Date(g.created).toLocaleString("en-US",{weekday:"short",hour:"numeric",minute:"2-digit"}):dayLabel(g.day);
+  const notes=all.filter(x=>x.note||x.adjReason).slice(0,6);
+  return head+`<div class="tiles t4">${t(`RQ cash · ${range}`,money(rq),`${act.length} active day${act.length===1?"":"s"}`,"var(--accent)")}${t("Deposited (Brinks)",money(br),`${money(br-rq,1)} vs RQ`,"var(--green)")}
+    ${t("Open now",open.length?money(openAmt):"$0",open.length?`${open.length} day${open.length===1?"":"s"}`:"nothing open",open.length?"var(--red)":"var(--green)")}${t("Days reconciled",`${ok}<span class="muted" style="font-size:16px"> / ${act.length}</span>`,act.length?`${Math.round(ok/act.length*100)}%`:"—","var(--purple)")}</div>
+  <div class="sp-grid"><section class="sp-days" aria-label="Day by day">
+    <div class="sp-h"><span>Day</span><span>RQ cash audit</span><span>Brinks</span><span style="text-align:right">Difference</span><span style="text-align:right">Status</span></div>
+    ${rows.map(x=>`<button class="sp-r" data-row="${x.date}|${wz}"><b style="font-size:14px">${dayLabel(x.date)}</b><span class="bar b-rq">${bar(Number(x.rq)||0,"color-mix(in srgb,var(--accent) 55%,var(--surface))")}</span><span class="bar b-br">${bar(Number(x.brinks)||0,"var(--green)")}</span>
+      <span class="num c-d ${x.finalDiff<-0.004?"neg":x.finalDiff>0.004?"pos":""}" style="text-align:right">${Math.abs(x.finalDiff)<.005?"—":money(x.finalDiff,1)}</span><span class="cell-st">${x.status==="NO ACTIVITY"?'<span class="pill p-none">No activity</span>':pill(x)}</span></button>`).join("")||`<div class="empty"><b>No history yet</b></div>`}
+    <p class="fine" style="margin:0;padding:10px 14px">Blue = cash RQ says the store took · Green = what reached the Brinks safe. Tap a day for cashouts, bags and adjustments.</p></section>
+  <aside class="sp-aside">${fix}
+    <div class="card"><div class="group-h"><h3>Bags and drops · last 7 days</h3><span>${bags.length}</span></div>
+      <div class="mini">${bags.slice(0,10).map(g=>`<div class="mini-r"><span>${fmtT(g)} · ${esc(g.by)}</span><b class="num">${money(g.amount)}</b><small>${esc(g.status)}${g.comments?` · “${esc(g.comments)}”`:""}</small></div>`).join("")||`<div class="mini-r"><span class="muted">${S.boot.days.slice(0,7).every(d=>S.days[d.date])?"No bags in the last 7 days":"Loading…"}</span></div>`}</div></div>
+    <div class="card"><div class="group-h"><h3>Team notes</h3><span>${notes.length}</span></div>
+      <div class="mini">${notes.map(x=>`<div class="mini-r" data-row="${x.date}|${wz}" style="cursor:pointer"><span>${dayLabel(x.date)}${x.adjBy?` · ${esc(x.adjBy)}`:""}</span><small>${esc([x.adjReason,x.note].filter(Boolean).join(" — "))}</small></div>`).join("")||`<div class="mini-r"><span class="muted">No notes yet. Open a day to add one.</span></div>`}</div></div>
+    <button class="btn" data-calgo="${wz}">Month calendar →</button>
+  </aside></div>`;
+}
+function bindStorePage(){
+  const b=$("sp-back"); if(b) b.onclick=()=>go(S.prevView||"todo");
+  const pk=$("sp-pick"); if(pk) pk.onchange=()=>openStorePage(pk.value);
+  $("main").querySelectorAll("[data-spn]").forEach(x=>x.onclick=()=>{ S.spN=Number(x.dataset.spn); render(); });
+  $("main").querySelectorAll("[data-calgo]").forEach(x=>x.onclick=()=>{ S.calWz=x.dataset.calgo; go("cal"); });
+  const m=$("sp-match"); if(m) m.onclick=async()=>{ m.disabled=true; const x=await api("allocate",{wz:S.spWz,depDate:m.dataset.dep,days:m.dataset.days.split(","),kind:"match"});
+    if(!x.ok){ toast(errText(x)); m.disabled=false; return; } toast(`Matched ${money(x.moved)}`); S.days={}; dropCaches(); const bb=await api("bootstrap"); if(bb.ok) S.boot=bb; writeCache(); loadStorePage(); };
 }
 function bindV3(){
   const m=$("main");
@@ -1215,6 +1313,7 @@ function bindV3(){
   m.querySelectorAll("[data-hn]").forEach(x=>x.onclick=()=>{ S.heatN=Number(x.dataset.hn); render(); loadHeat(); });
   m.querySelectorAll("[data-hall]").forEach(x=>x.onclick=()=>{ S.heatAll=x.dataset.hall==="1"; render(); });
   if(S.view==="todo") bindTodo();
+  if(S.view==="store"){ bindStorePage(); if(!S.sp||S.sp.wz!==S.spWz) loadStorePage(); }
   if(S.view==="heat"&&!S.heatData) loadHeat();
   if(S.view==="dms"&&S.dmN===7&&!S.dmData) loadDmRange();
 }
@@ -1230,7 +1329,7 @@ function bindView(){
   const nx=$("dnext"); if(nx) nx.onclick=()=>loadDay(S.boot.days[i-1].date);
   m.querySelectorAll("[data-tday]").forEach(x=>x.onclick=()=>loadDay(x.dataset.tday));
   m.querySelectorAll("[data-row]").forEach(x=>x.onclick=()=>{ const [d,w]=x.dataset.row.split("|"); rowSheet(d,w); });
-  m.querySelectorAll("[data-store]").forEach(x=>x.onclick=()=>storeSheet(x.dataset.store));
+  m.querySelectorAll("[data-store]").forEach(x=>x.onclick=()=>openStorePage(x.dataset.store));
   m.querySelectorAll("[data-user]").forEach(x=>x.onclick=()=>userSheet(S.users.users.find(u=>u.email===x.dataset.user)));
   const ua=$("uadd"); if(ua) ua.onclick=()=>userSheet(null);
   const lk=$("lockday"); if(lk) lk.onclick=()=>setLock(true);
