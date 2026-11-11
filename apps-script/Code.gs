@@ -177,10 +177,44 @@ function ingestRQ() {
     if (props.getProperty(key)) continue;
     var rows = xlsxToValues_(f.getBlob(), f.getName());
     var parsed = parseRQRows(rows, m[1], f.getName());
+    var bad = rqFileProblem_(parsed, m[1]);
+    if (bad) {                                   // wrong / partial file: keep yesterday's good data, tell the admin once
+      logRun('RQ file REJECTED ' + f.getName() + ': ' + bad);
+      if (!props.getProperty('rqbad_' + key)) {
+        props.setProperty('rqbad_' + key, '1');
+        try {
+          MailApp.sendEmail({ to: adminEmail_(), subject: '⚠️ RQ file rejected — ' + f.getName(),
+            htmlBody: '<p>The RQ Cash Audit file <b>' + f.getName() + '</b> was <b>not imported</b>: ' + bad + '.</p>' +
+              '<p>Nothing was overwritten. Most likely a custom Cash Audit Trail run in Hub got picked up. Fix: in Hub re-run the ' +
+              '"Yesterday · all stores · CASHOUT" report, export it, name it <code>' + f.getName() + '</code> and replace the file in ' +
+              '<i>Brinks Recon › RQ Cash Audit</i>, then run catchUp (or wait for the next run).</p>' });
+        } catch (e) { logRun('RQ reject email failed: ' + e.message); }
+      }
+      continue;
+    }
     replaceRowsByDate_(TABS.RQ, RQ_HEADERS, 0, m[1], parsed);
     props.setProperty(key, '1');
     logRun('RQ ingested ' + f.getName() + ': ' + parsed.length + ' cashouts');
   }
+}
+
+/** Sanity check before an RQ file replaces a day: right dates inside, and (close to) all stores. '' = OK. */
+function rqFileProblem_(parsed, bizDate) {
+  if (!parsed.length) return 'it has no cashout rows';
+  var tz = Session.getScriptTimeZone(), next = Utilities.formatDate(new Date(new Date(bizDate + 'T12:00:00').getTime() + 864e5), tz, 'yyyy-MM-dd');
+  var dOf = function (v) {
+    if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+    var s = String(v).trim(), a = s.match(/^(\d{4})-(\d{2})-(\d{2})/), b = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    return a ? a[0] : b ? b[3] + '-' + ('0' + b[1]).slice(-2) + '-' + ('0' + b[2]).slice(-2) : '';
+  };
+  var seen = {}, ok = 0, dated = 0, other = {};
+  parsed.forEach(function (r) { var d = dOf(r[4]); if (r[1]) seen[r[1]] = 1; if (!d) return; dated++;
+    if (d === bizDate || d === next) ok++; else other[d] = (other[d] || 0) + 1; });
+  if (dated && ok / dated < 0.8) return 'only ' + ok + ' of ' + dated + ' cashouts are dated ' + bizDate + ' (file also has ' + Object.keys(other).sort().join(', ') + ')';
+  var smap = loadStoreMap_(), active = Object.keys(smap.byWZ).filter(function (w) { return smap.byWZ[w].active; }).length;
+  var n = Object.keys(seen).length, min = Math.max(5, Math.floor(active * 0.5));
+  if (n < min) return 'it only covers ' + n + ' stores (expected about ' + active + ' — looks filtered)';
+  return '';
 }
 
 /** Pure: Cash Audit Trail rows -> RQ_Raw rows. */
