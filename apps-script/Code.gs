@@ -34,7 +34,8 @@ var DEFAULT_CFG = {
   RECHECK_DAYS: '3',                 // re-reconcile this many recent days each run (late bags)
   MISSING_FILE_ALERT_HOUR: '11',     // after this hour, email admin if inputs still missing
   ALERT_SEND_HOUR: '12',             // daily recon email goes out at/after this hour (recon itself keeps refreshing from 6 AM)
-  RUN_END_HOUR: '15'                 // runDaily stops acting at this hour (checks every 15 min until then)
+  RUN_END_HOUR: '15',                // runDaily stops acting at this hour (checks every 15 min until then)
+  MAIL_VIA: 'outlook'                // outlook = send recon emails from the work account via the Zapier relay (falls back to Gmail) · gmail = Gmail only
 };
 
 var LOG_HEADERS = ['Date', 'WZ #', 'Store', 'Company', 'DM', 'RQ Deposit', 'Brinks Declared', 'Difference',
@@ -584,8 +585,8 @@ function sendAlert_(bizDate) {
   var to = isTest_(cfg) ? uniq([adminEmail_(), cfg.RECON_TEAM || '']) : live;
   if (isTest_(cfg)) html = html.replace('TEST MODE — this alert went to the admin only.</p>',
     'TEST MODE — this alert went to the admin only.<br><span style="font-size:12px">When live it goes to ' + live.length + ' people: ' + live.join(', ') + '</span></p>');
-  MailApp.sendEmail({ to: to.join(','), subject: subj, htmlBody: html });
-  logRun('Alert sent for ' + bizDate + ' to ' + to.join(','));
+  var via = sendMail_({ to: to.join(','), subject: subj, htmlBody: html });
+  logRun('Alert sent for ' + bizDate + ' via ' + via + ' to ' + to.join(','));
   try { sendStoreAlerts_(bizDate, log, cfg, day, money); } catch (e) { logRun('Store-manager alerts failed: ' + e); }
 }
 
@@ -639,15 +640,15 @@ function sendStoreAlerts_(bizDate, log, cfg, day, money) {
       out.map(function (m) {
         return '<hr><p style="color:#666;font-size:12px">To: ' + m.to + (m.cc ? ' · Cc: ' + m.cc : '') + '<br>Subject: <b>' + m.subj + '</b></p>' + m.html;
       }).join('') + '</div>';
-    MailApp.sendEmail({ to: adminEmail_(), subject: '🧪 SM alert preview ' + day + ' — ' + out.length + ' store email(s)', htmlBody: prev });
+    sendMail_({ to: adminEmail_(), subject: '🧪 SM alert preview ' + day + ' — ' + out.length + ' store email(s)', htmlBody: prev });
     logRun('SM alert preview for ' + bizDate + ': ' + out.length + ' email(s), ' + noSM.length + ' open with no SM');
     return;
   }
   var sent = 0, skipped = 0;
   out.forEach(function (m) {
     var need = (m.to + (m.cc ? ',' + m.cc : '')).split(',').length;
-    if (MailApp.getRemainingDailyQuota() < need + 5) { skipped++; return; }   // keep headroom for the admin alert tomorrow
-    MailApp.sendEmail({ to: m.to, cc: m.cc || '', subject: m.subj, htmlBody: m.html, replyTo: [m.cc, adminEmail_()].filter(String).join(',') });
+    if (!mailRelay_() && MailApp.getRemainingDailyQuota() < need + 5) { skipped++; return; }   // Gmail only: keep headroom for the admin alert tomorrow
+    sendMail_({ to: m.to, cc: m.cc || '', subject: m.subj, htmlBody: m.html, replyTo: [m.cc, adminEmail_()].filter(String).join(',') });
     sent++;
   });
   logRun('SM alerts for ' + bizDate + ': ' + sent + ' sent' + (skipped ? ', ' + skipped + ' skipped (daily email quota)' : '') +
@@ -671,6 +672,7 @@ function setupTabs() {
     MISSING_FILE_ALERT_HOUR: 'Hour after which a missing-input email is sent',
     ALERT_SEND_HOUR: 'Hour the daily recon email goes out (24h clock; 12 = noon). Recon still refreshes from 6 AM.',
     RUN_END_HOUR: 'Hour the 15-min checks stop for the day (24h clock)',
+    MAIL_VIA: 'outlook = recon emails go out from the work Outlook account (via Zapier, falls back to Gmail) · gmail = Gmail only',
     ACH_QUERY: 'Gmail search for the Brinks ACH report (backup for safe drops missing from Device Activity)',
     ACH_FOLDER_PATH: 'Drive folder for manual ACH report exports (loaded automatically)'
   };
@@ -1137,4 +1139,41 @@ function ymd_(v) {
   var s = String(v).trim(), m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) return m[3] + '-' + ('0' + m[1]).slice(-2) + '-' + ('0' + m[2]).slice(-2);
   return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : '';
+}
+
+// ───────────────────────── EMAIL: Outlook relay (Zapier) with Gmail fallback ─────────────────────────
+// Recon emails go out from the work Outlook account through a private Zapier workflow ("Cash Recon Email Relay (Outlook)").
+// Script Properties: MAIL_RELAY_URL (the workflow's catch-hook URL) + MAIL_RELAY_SECRET. Config MAIL_VIA = outlook | gmail.
+// If the relay isn't set up, is switched off, or the POST fails, the email goes out through Gmail (MailApp) as before.
+function mailRelay_() {
+  var p = PropertiesService.getScriptProperties(), url = p.getProperty('MAIL_RELAY_URL'), secret = p.getProperty('MAIL_RELAY_SECRET');
+  if (!url || !secret || /^gmail$/i.test(String(getCfg_().MAIL_VIA || '').trim())) return null;
+  return { url: url, secret: secret };
+}
+function sendMail_(o) {
+  var relay = mailRelay_();
+  if (relay) {
+    try {
+      var res = UrlFetchApp.fetch(relay.url, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+        payload: JSON.stringify({ secret: relay.secret, to: o.to, cc: o.cc || '', bcc: o.bcc || '', reply_to: o.replyTo || '',
+          subject: o.subject, html: o.htmlBody || null, text: o.htmlBody ? null : (o.body || '') }) });
+      var code = res.getResponseCode();
+      if (code >= 200 && code < 300) return 'outlook';
+      logRun('Outlook relay HTTP ' + code + ' — sending via Gmail instead: ' + String(res.getContentText()).slice(0, 300));
+    } catch (e) { logRun('Outlook relay error — sending via Gmail instead: ' + e.message); }
+  }
+  MailApp.sendEmail(o);
+  return 'gmail';
+}
+/** One-time setup from the editor: paste the relay URL + secret, run once, then delete the values from this function. */
+function setMailRelay(url, secret) {
+  if (!url || !secret) throw new Error('Pass the Zapier catch-hook URL and the relay secret');
+  PropertiesService.getScriptProperties().setProperties({ MAIL_RELAY_URL: url, MAIL_RELAY_SECRET: secret });
+  logRun('Outlook mail relay configured');
+}
+/** Sends a test through the relay to the admin. */
+function testMailRelay() {
+  var via = sendMail_({ to: adminEmail_(), subject: 'Cash Recon — test email via ' + (mailRelay_() ? 'Outlook relay' : 'Gmail'),
+    htmlBody: '<p>Test from the Cash Recon engine at ' + new Date() + '.</p>' });
+  logRun('testMailRelay sent via ' + via);
 }
