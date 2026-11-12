@@ -905,6 +905,7 @@ function brinksCatchUp(days) {
   var t0 = Date.now(), n = Number(days) || 7, tz = Session.getScriptTimeZone();
   var hdr = ss_().getSheetByName(TABS.BR);
   if (hdr && hdr.getLastColumn() < BR_HEADERS.length) hdr.getRange(1, 1, 1, BR_HEADERS.length).setValues([BR_HEADERS]).setFontWeight('bold');
+  ingestRQ();
   ingestBrinks();
   try { ingestACH(); } catch (e) { logRun('ACH ingest error: ' + e.message); }
   var target = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), win = [];
