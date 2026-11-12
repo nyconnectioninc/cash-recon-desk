@@ -32,7 +32,9 @@ var DEFAULT_CFG = {
   ACH_QUERY: 'from:brinksinc.com subject:ACH has:attachment newer_than:10d',   // Brinks ACH report (backup source for smart safes)
   ACH_FOLDER_PATH: 'Brinks Recon/ACH Reports',         // or drop an ACH report export here
   RECHECK_DAYS: '3',                 // re-reconcile this many recent days each run (late bags)
-  MISSING_FILE_ALERT_HOUR: '11'      // after this hour, email admin if inputs still missing
+  MISSING_FILE_ALERT_HOUR: '11',     // after this hour, email admin if inputs still missing
+  ALERT_SEND_HOUR: '12',             // daily recon email goes out at/after this hour (recon itself keeps refreshing from 6 AM)
+  RUN_END_HOUR: '15'                 // runDaily stops acting at this hour (checks every 15 min until then)
 };
 
 var LOG_HEADERS = ['Date', 'WZ #', 'Store', 'Company', 'DM', 'RQ Deposit', 'Brinks Declared', 'Difference',
@@ -63,7 +65,7 @@ function installTriggers() {
   ScriptApp.newTrigger('runDaily').timeBased().everyMinutes(15).create();
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'onOpen') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('onOpen').forSpreadsheet(SHEET_ID).onOpen().create();   // adds the Cash Recon menu to the sheet
-  logRun('Triggers installed (runDaily every 15 min; acts only 6:00–11:59 AM)');
+  logRun('Triggers installed (runDaily every 15 min; acts 6 AM until RUN_END_HOUR; email at ALERT_SEND_HOUR)');
 }
 
 function promptReconDate() {
@@ -85,12 +87,13 @@ function runDaily() {
     var tz = Session.getScriptTimeZone();
     var now = new Date();
     var hour = Number(Utilities.formatDate(now, tz, 'H'));
-    if (hour < 6 || hour > 11) return;                       // quiet outside the morning window
+    var cfg = getCfg_();
+    var endHour = Number(cfg.RUN_END_HOUR) || 15, sendHour = Number(cfg.ALERT_SEND_HOUR) || 12;
+    if (hour < 6 || hour >= endHour) return;                  // quiet outside the 6 AM – RUN_END_HOUR window
 
     setupTabs();
     ingestAll();
 
-    var cfg = getCfg_();
     var props = PropertiesService.getScriptProperties();
     var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
     var target = addDays_(today, -1);
@@ -102,7 +105,7 @@ function runDaily() {
       var win = [];
       for (var i = n - 1; i >= 0; i--) { win.push(addDays_(target, -i)); reconcileAndWrite_(addDays_(target, -i)); }
       netWindow_(win);
-      if (props.getProperty('alert_sent_' + target) !== '1') {
+      if (hour >= sendHour && props.getProperty('alert_sent_' + target) !== '1') {   // recon refreshes all morning; email waits for ALERT_SEND_HOUR
         sendAlert_(target);
         props.setProperty('alert_sent_' + target, '1');
       }
@@ -112,7 +115,7 @@ function runDaily() {
       if (!haveBR) miss.push('Brinks Deposit Report email for ' + today);
       MailApp.sendEmail(adminEmail_(), '⚠️ Cash Recon blocked — missing input for ' + target,
         'The recon for ' + target + ' could not run because these inputs are missing:\n\n• ' + miss.join('\n• ') +
-        '\n\nIt will run automatically as soon as they arrive (checks every 15 min until noon), or use Cash Recon → Run now.');
+        '\n\nIt will run automatically as soon as they arrive (checks every 15 min until ' + endHour + ':00; the recon email goes out at ' + sendHour + ':00 or as soon as inputs arrive after that), or use Cash Recon → Run now.');
       props.setProperty('missing_sent_' + target, '1');
       logRun('Missing inputs for ' + target + ': ' + miss.join(' | '));
     }
@@ -666,6 +669,8 @@ function setupTabs() {
     BRINKS_QUERY: 'Gmail search for the Brinks Deposit Report', DEVICE_QUERY: 'Gmail search for the Brinks Device Activity report (all safe types)',
     BRINKS_IMPORT_PATH: 'Drive folder for manual Brinks exports (loaded automatically)', RECHECK_DAYS: 'Recent days re-reconciled each run (late bags)',
     MISSING_FILE_ALERT_HOUR: 'Hour after which a missing-input email is sent',
+    ALERT_SEND_HOUR: 'Hour the daily recon email goes out (24h clock; 12 = noon). Recon still refreshes from 6 AM.',
+    RUN_END_HOUR: 'Hour the 15-min checks stop for the day (24h clock)',
     ACH_QUERY: 'Gmail search for the Brinks ACH report (backup for safe drops missing from Device Activity)',
     ACH_FOLDER_PATH: 'Drive folder for manual ACH report exports (loaded automatically)'
   };
