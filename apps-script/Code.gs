@@ -899,17 +899,39 @@ function activateNewInstalls_(parsed) {
   } catch (e) { logRun('Install email failed: ' + e.message); }
 }
 
-/** Manual: load everything new (incl. Brinks Imports), then re-run recon + netting for the last N days. */
+/** Manual: load everything new (incl. Brinks Imports), then re-run recon + netting for the last N days.
+ *  Reconciling ~100 stores takes ~35 s/day, so long windows continue in a follow-up run (1 min later) instead of hitting the 6-min limit. */
 function brinksCatchUp(days) {
-  var n = Number(days) || 7, tz = Session.getScriptTimeZone();
+  var t0 = Date.now(), n = Number(days) || 7, tz = Session.getScriptTimeZone();
   var hdr = ss_().getSheetByName(TABS.BR);
   if (hdr && hdr.getLastColumn() < BR_HEADERS.length) hdr.getRange(1, 1, 1, BR_HEADERS.length).setValues([BR_HEADERS]).setFontWeight('bold');
   ingestBrinks();
   try { ingestACH(); } catch (e) { logRun('ACH ingest error: ' + e.message); }
   var target = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), win = [];
-  for (var i = n - 1; i >= 0; i--) { var d = addDays_(target, -i); win.push(d); reconcileAndWrite_(d); }
-  netWindow_(win);
-  logRun('brinksCatchUp: re-ran ' + win[0] + ' → ' + win[win.length - 1]);
+  for (var i = n - 1; i >= 0; i--) win.push(addDays_(target, -i));
+  PropertiesService.getScriptProperties().setProperty('catchup_queue', JSON.stringify({ todo: win, all: win }));
+  catchUpContinue(t0);
+}
+
+/** Works through the catch-up queue; re-schedules itself if it runs low on time, nets the whole window at the end. */
+function catchUpContinue(t0) {
+  t0 = typeof t0 === 'number' ? t0 : Date.now();
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'catchUpContinue') ScriptApp.deleteTrigger(t); });
+  var props = PropertiesService.getScriptProperties(), q = JSON.parse(props.getProperty('catchup_queue') || 'null');
+  if (!q) return;
+  while (q.todo.length) {
+    if (Date.now() - t0 > 270000) {
+      props.setProperty('catchup_queue', JSON.stringify(q));
+      ScriptApp.newTrigger('catchUpContinue').timeBased().after(60 * 1000).create();
+      logRun('Catch-up paused (time limit) — continuing ' + q.todo[0] + ' → ' + q.todo[q.todo.length - 1] + ' in ~1 min');
+      return;
+    }
+    reconcileAndWrite_(q.todo.shift());
+    props.setProperty('catchup_queue', JSON.stringify(q));
+  }
+  netWindow_(q.all);
+  props.deleteProperty('catchup_queue');
+  logRun('Catch-up done: ' + q.all[0] + ' → ' + q.all[q.all.length - 1]);
 }
 
 
