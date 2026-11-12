@@ -51,7 +51,7 @@ function onOpen() {
     .addItem('Run now (ingest + recon + alert if ready)', 'runDaily')
     .addItem('Re-run recon for a date…', 'promptReconDate')
     .addItem('Ingest only (no alert)', 'ingestAll')
-    .addItem('Load ACH report + re-run last 10 days', 'achCatchUp')
+    .addItem('Load new files + re-run last 14 days', 'achCatchUp')
     .addSeparator()
     .addItem('Set up tabs', 'setupTabs')
     .addItem('Install daily triggers', 'installTriggers')
@@ -1127,8 +1127,8 @@ function activateFromACH_(activate) {
   } catch (e) { logRun('ACH activation email failed: ' + e.message); }
 }
 
-/** Manual: load ACH reports (email + Drive folder), then re-run recon + netting for the last 10 days. */
-function achCatchUp() { setupTabs(); brinksCatchUp(10); }
+/** Manual: load new RQ / Brinks / ACH files, then re-run recon + netting for the last 14 days (continues automatically if it runs long). */
+function achCatchUp() { setupTabs(); brinksCatchUp(14); }
 
 function ymd_(v) {
   if (v === '' || v == null) return '';
