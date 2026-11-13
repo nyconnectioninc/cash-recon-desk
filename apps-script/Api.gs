@@ -60,6 +60,7 @@ function doPost(e) {
       case 'day':       return deskJson_(deskDay_(me, String(b.date || '')));
       case 'store':     return deskJson_(deskStore_(me, String(b.wz || ''), Number(b.days) || 30));
       case 'saveAdj':   return deskJson_(deskSaveAdj_(me, b));
+      case 'decideAdj': return deskJson_(deskDecideAdj_(me, b));
       case 'users':     return deskJson_(deskUsers_(me));
       case 'saveUser':  return deskJson_(deskSaveUser_(me, b));
     }
@@ -208,7 +209,7 @@ function deskBootstrap_(me) {
   var pending = 0;
   if (me.isAdmin) readTab_(DESK2.REQ).forEach(function (r) { if (String(r[6]) === 'Pending') pending++; });
   return { ok: true, me: me, days: days, carry: carry, stores: stores, tolerance: Number(cfg.TOLERANCE) || 5,
-    safeLimit: Number(cfg.SAFE_LIMIT) || 5000, locks: desk2Locks_(), pendingRequests: pending, testMode: isTest_(cfg), lastRun: run ? { at: run[0] instanceof Date ? run[0].getTime() : null, msg: String(run[1]).slice(0, 160) } : null };
+    safeLimit: Number(cfg.SAFE_LIMIT) || 5000, locks: desk2Locks_(), pendingRequests: pending, pendingAdj: me.isAdmin ? deskPending_().length : 0, testMode: isTest_(cfg), lastRun: run ? { at: run[0] instanceof Date ? run[0].getTime() : null, msg: String(run[1]).slice(0, 160) } : null };
 }
 
 function deskDay_(me, date) {
@@ -225,7 +226,8 @@ function deskDay_(me, date) {
     var w = String(r[1] || ''); if (normDate_(r[0]) !== date || !sc.allowed[w]) return;
     (cash[w] = cash[w] || []).push({ tx: String(r[3]), by: String(r[5]), amount: Number(r[6]) || 0 });
   });
-  return { ok: true, date: date, rows: rows, bags: bags, cash: cash, allocs: allocs, locked: desk2Locks_()[date] || null };
+  var pend = me.canEdit ? deskPending_(date).filter(function (p) { return sc.allowed[p.wz]; }) : [];
+  return { ok: true, date: date, rows: rows, bags: bags, cash: cash, allocs: allocs, pending: pend, locked: desk2Locks_()[date] || null };
 }
 
 function deskStore_(me, wz, days) {
@@ -237,31 +239,100 @@ function deskStore_(me, wz, days) {
 }
 
 /* ---------- edits (Editor / Admin) ---------- */
-function deskSaveAdj_(me, b) {
+/** Script lock for a dashboard write. Returns null (→ error "busy", the page retries) instead of throwing. */
+function deskLock_() {
+  var l = LockService.getScriptLock(); if (l.tryLock(25000)) return l;
+  try { var p = PropertiesService.getScriptProperties(), a = JSON.parse(p.getProperty('busy_log') || '[]'); a.push(Date.now()); p.setProperty('busy_log', JSON.stringify(a.slice(-300))); } catch (e) {}
+  return null;
+}
+
+var ADJ_RULES = { NOTE_OVER: 100, SPLIT_OVER: 500, APPROVAL_OVER: 1000, PENDING: 'Pending_Adjustments',
+  PENDING_H: ['ID', 'Date', 'WZ #', 'Store', 'Adjust $', 'Reason', 'Note', 'Requested By', 'Requested At', 'Status', 'Decided By', 'Decided At'] };
+
+/**
+ * Save an adjustment / note. Guardrails (server-enforced so every client behaves the same):
+ *  - conflict:      someone changed this store-day's adjustment/note since the page loaded it  → refresh first
+ *  - note_required: |adj| > $100 needs a note (who confirmed it)
+ *  - wrong_sign:    the adjustment moves the difference further from $0                         → confirm (ack "sign")
+ *  - use_split:     |adj| > $500 or a "late / drop / combined" reason — money for other days    → confirm (ack "split")
+ *  - pending:       non-admin |adj| > $1,000 goes to Pending_Adjustments for an admin to approve
+ */
+function deskSaveAdj_(me, b, approved) {
   if (!me.canEdit) return { ok: false, error: 'read_only' };
-  var date = String(b.date || ''), wz = String(b.wz || '');
+  var date = String(b.date || ''), wz = String(b.wz || ''), ack = b.ack || [];
   var adj = b.adj === '' || b.adj === null || b.adj === undefined ? '' : Number(b.adj);
   if (adj !== '' && (isNaN(adj) || Math.abs(adj) > 100000)) return { ok: false, error: 'bad_amount' };
-  if (adj !== '' && adj !== 0 && !String(b.reason || '').trim()) return { ok: false, error: 'reason_required' };
+  var reason = String(b.reason || '').trim().slice(0, 200), note = String(b.note || '').trim().slice(0, 1000);
+  if (adj !== '' && adj !== 0 && !reason) return { ok: false, error: 'reason_required' };
   if (desk2Locks_()[date]) return { ok: false, error: 'day_locked' };
-  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  var lock = deskLock_(); if (!lock) return { ok: false, error: 'busy' };
   try {
     var sh = sheet_(TABS.LOG, LOG_HEADERS), v = sh.getDataRange().getValues();
     for (var i = 1; i < v.length; i++) {
       if (normDate_(v[i][0]) !== date || String(v[i][1]) !== wz) continue;
-      var tol = Number(getCfg_().TOLERANCE) || 5, diff = Number(v[i][7]) || 0, base = String(v[i][8]);
-      var a = adj === '' ? 0 : adj, fd = round2_(diff + a);
+      var cur = deskRow_(v[i]);
+      if (b.prev && !approved) {
+        var same = function (x, y) { return String(x === '' || x === null || x === undefined ? '' : x).trim() === String(y === '' || y === null || y === undefined ? '' : y).trim(); };
+        var pa = b.prev.adj === '' || b.prev.adj === null || b.prev.adj === undefined ? '' : Number(b.prev.adj);
+        if (!same(pa, cur.adj) || !same(b.prev.reason, cur.adjReason) || !same(b.prev.note, cur.note))
+          return { ok: false, error: 'conflict', by: cur.adjBy, row: cur };
+      }
+      var a = adj === '' ? 0 : adj, changed = round2_(a) !== round2_(cur.adj === '' ? 0 : cur.adj);
+      if (changed && !approved) {
+        var tolC = Number(getCfg_().TOLERANCE) || 5, diff = Number(v[i][7]) || 0;
+        if (Math.abs(a) > ADJ_RULES.NOTE_OVER && !note) return { ok: false, error: 'note_required' };
+        if (a && Math.abs(diff + a) > Math.abs(diff) + tolC && ack.indexOf('sign') < 0)
+          return { ok: false, error: 'wrong_sign', suggest: round2_(-diff) };
+        if (a && (Math.abs(a) > ADJ_RULES.SPLIT_OVER || /late|drop|combined|several days|multiple days/i.test(reason)) && ack.indexOf('split') < 0)
+          return { ok: false, error: 'use_split' };
+        if (!me.isAdmin && Math.abs(a) > ADJ_RULES.APPROVAL_OVER) {
+          var id = 'PA-' + Utilities.getUuid().slice(0, 8);
+          desk2Tab_(ADJ_RULES.PENDING, ADJ_RULES.PENDING_H).appendRow([id, date, wz, cur.store, a, reason, note, me.name + ' <' + me.email + '>', new Date(), 'Pending', '', '']);
+          deskLog_(me, date, wz, cur.store, 'Adjustment requested ' + money_(a), [reason, note].filter(String).join(' — '));
+          try { MailApp.sendEmail(adminEmail_(), 'Cash Recon: approve ' + money_(a) + ' adjustment — ' + cur.store + ' ' + date,
+            me.name + ' asked for a ' + money_(a) + ' adjustment on ' + cur.store + ' (' + wz + ') for ' + date + '.\n\nReason: ' + reason +
+            '\nNote: ' + note + '\n\nApprove or reject it in the Cash Recon Desk (open the store for that day): ' + DESK2.SITE); } catch (e) {}
+          return { ok: true, pending: true, id: id, row: cur };
+        }
+      }
+      var tol = Number(getCfg_().TOLERANCE) || 5, base = String(v[i][8]), fd = round2_((Number(v[i][7]) || 0) + a);
       var fs = a ? (Math.abs(fd) <= tol ? 'RESOLVED (manual)' : base + ' (adj)')
                  : (/late drop/.test(String(v[i][16])) ? String(v[i][16]) : base);
       if (!a && /late drop/.test(String(v[i][16]))) fd = Number(v[i][15]) || 0;
-      var reason = String(b.reason || '').slice(0, 200), note = String(b.note || '').slice(0, 1000);
-      sh.getRange(i + 1, 12, 1, 7).setValues([[adj === 0 ? '' : adj, reason, me.name, note, fd, fs, new Date()]]);
-      deskLog_(me, date, wz, String(v[i][2]), adj !== '' && adj !== 0 ? 'Adjustment ' + money_(adj) : 'Note',
+      var by = approved ? approved.by : me.name;
+      sh.getRange(i + 1, 12, 1, 7).setValues([[adj === 0 ? '' : adj, reason, by, note, fd, fs, new Date()]]);
+      deskLog_(me, date, wz, String(v[i][2]), adj !== '' && adj !== 0 ? 'Adjustment ' + money_(adj) + (approved ? ' (approved)' : '') : 'Note',
         [reason, note].filter(String).join(' — '));
       return { ok: true, row: deskRow_(sh.getRange(i + 1, 1, 1, 18).getValues()[0]) };
     }
     return { ok: false, error: 'not_found' };
   } finally { lock.releaseLock(); }
+}
+
+/** Pending (>$1,000, non-admin) adjustments for a day — admins see and decide them on the store sheet. */
+function deskPending_(date) {
+  var sh = ss_().getSheetByName(ADJ_RULES.PENDING); if (!sh) return [];
+  return sh.getDataRange().getValues().slice(1).filter(function (r) { return String(r[9]) === 'Pending' && (!date || normDate_(r[1]) === date); })
+    .map(function (r) { return { id: String(r[0]), date: normDate_(r[1]), wz: String(r[2]), store: String(r[3]), adj: Number(r[4]) || 0,
+      reason: String(r[5]), note: String(r[6]), by: String(r[7]).replace(/ <.*$/, ''), at: r[8] instanceof Date ? r[8].getTime() : null }; });
+}
+function deskDecideAdj_(me, b) {
+  if (!me.isAdmin) return { ok: false, error: 'admin_only' };
+  var sh = ss_().getSheetByName(ADJ_RULES.PENDING); if (!sh) return { ok: false, error: 'not_found' };
+  var v = sh.getDataRange().getValues();
+  for (var i = 1; i < v.length; i++) {
+    if (String(v[i][0]) !== String(b.id) || String(v[i][9]) !== 'Pending') continue;
+    var res = { ok: true };
+    if (b.approve) {
+      res = deskSaveAdj_(me, { date: normDate_(v[i][1]), wz: String(v[i][2]), adj: Number(v[i][4]), reason: String(v[i][5]),
+        note: String(v[i][6]) + ' [approved by ' + me.name + ']' }, { by: String(v[i][7]).replace(/ <.*$/, '') });
+      if (!res.ok) return res;
+    }
+    sh.getRange(i + 1, 10, 1, 3).setValues([[b.approve ? 'Approved' : 'Rejected', me.name, new Date()]]);
+    deskLog_(me, normDate_(v[i][1]), String(v[i][2]), String(v[i][3]), (b.approve ? 'Approved' : 'Rejected') + ' adjustment ' + money_(v[i][4]), String(v[i][0]));
+    return res;
+  }
+  return { ok: false, error: 'not_found' };
 }
 
 function deskLog_(me, date, wz, store, change, detail) {

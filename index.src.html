@@ -408,17 +408,28 @@ function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); c
 /* ---------- API ---------- */
 async function api(action,payload){
   if(!/^https:\/\/script\.google\.com\//.test(API_URL)) return {ok:false,error:"not_configured"};
-  try{
-    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify(Object.assign({action,token:S.token},payload||{}))});
-    const j=await res.json();
+  const waits=[2000,5000,10000,15000,20000];   // "busy" = the recon engine is writing for a few seconds: retry, keep the user's input
+  for(let k=0;;k++){
+    let j;
+    try{
+      const res=await fetch(API_URL,{method:"POST",body:JSON.stringify(Object.assign({action,token:S.token},payload||{}))});
+      j=await res.json();
+    }catch(e){ return {ok:false,error:"network"}; }
     if(j && j.error==="signed_out"){ signOut("Your session ended. Sign in again."); }
-    return j;
-  }catch(e){ return {ok:false,error:"network"}; }
+    if(!(j && j.error==="busy") || k>=waits.length) return j;
+    toast("Recon is updating. Saving automatically…");
+    await new Promise(r=>setTimeout(r,waits[k]));
+  }
 }
 const errText = r => ({not_configured:"The dashboard isn't connected to its backend yet.",network:"Couldn't reach the server. Check your connection.",
   read_only:"Your access is view-only.",reason_required:"Add a reason for the adjustment.",bad_amount:"Enter a valid amount.",
   admin_only:"Only admins can do that.",day_locked:"That day is closed. An admin has to reopen it first.",no_extra:"There's no extra amount on this day to move.",
-  pick_days:"Pick at least one earlier day.",nothing_to_move:"Those days have nothing open to cover.",not_allowed:"That store isn't in your access.",bad_date:"Pick a valid date.",cant_remove_self:"You can't remove your own admin access.",server_error:"The server hit an error. Try again."})[r&&r.error]||"Something went wrong. Try again.";
+  pick_days:"Pick at least one earlier day.",nothing_to_move:"Those days have nothing open to cover.",not_allowed:"That store isn't in your access.",bad_date:"Pick a valid date.",cant_remove_self:"You can't remove your own admin access.",server_error:"The server hit an error. Try again.",
+  busy:"The recon is still updating. Your changes weren't saved. Try again in a minute.",
+  note_required:"Adjustments over $100 need a note: what happened and who confirmed it.",
+  conflict:"Someone else changed this day while you had it open. It's reloaded with their change. Check it, then save again.",
+  wrong_sign:"This adjustment pushes the difference further from $0. Check the sign.",
+  use_split:"This looks like money that belongs to other days. Use Split / Apply match above so those days clear too."})[r&&r.error]||"Something went wrong. Try again.";
 
 /* ---------- session ---------- */
 function loadSession(){ try{ const x=JSON.parse(localStorage.getItem(TOKEN_KEY)||"null"); if(x&&x.token&&x.expires>Date.now()){ S.token=x.token; S.me=x.me; } }catch(e){} }
@@ -751,6 +762,7 @@ async function rowSheet(date,wz){
         <small>${esc(g.barcode)} · ${esc(g.status)}${g.storeId?` · Brinks ID ${esc(g.storeId)}`:""}${g.comments?` · “${esc(g.comments)}”`:""}${g.note?`<br>${esc(g.note)}`:""}</small></div>`).join("")||`<div class="mini-r"><span class="muted">No Brinks bag assigned to this day</span></div>`}</div></div>
     <div id="alloc-box"></div>
     <div><div class="group-h"><h3>Last 30 days</h3><span id="h-sum"></span></div><div class="card" id="h-box"><div class="hist muted" style="font-size:13px;align-items:center">Loading…</div></div></div>
+    ${pendHtml((day&&day.pending||[]).filter(p=>p.wz===wz))}
     ${can?`<form class="form" id="af"><h3>Adjustment / note</h3>
       <div class="row2"><label>Adjust $<input id="a-amt" inputmode="decimal" placeholder="0.00" value="${r.adj===""?"":esc(r.adj)}"></label>
       <label>Reason<input id="a-rsn" list="rsn" value="${esc(r.adjReason)}" placeholder="Why"></label></div>
@@ -758,21 +770,47 @@ async function rowSheet(date,wz){
       ${Math.abs(r.diff)>0.004?`<div class="quick"><button type="button" data-fill="${(-r.diff).toFixed(2)}">Clear difference (${money(-r.diff,1)})</button></div>`:""}
       <label>Note<textarea id="a-note" placeholder="What happened, who confirmed it">${esc(r.note)}</textarea></label>
       <p class="err" id="a-err"></p><button class="btn primary" type="submit">Save</button>
-      <p class="fine">Adjustment is added to the difference. If the result is within the $${S.boot.tolerance} tolerance, the store shows Resolved. The engine never overwrites these fields.</p></form>`
+      <p class="fine">Adjustment is added to the difference. If the result is within the $${S.boot.tolerance} tolerance, the store shows Resolved. The engine never overwrites these fields. Money that belongs to other days goes through <b>Split</b>, not here. Over $100 needs a note; over $1,000 needs admin approval.</p></form>`
     :`<p class="fine">${isLocked(date)?`🔒 ${lockedMsg(date)}. Reopen the day to change it.`:"View only. Ask an editor to log adjustments."}</p>`}
   </div>`);
   const tsp=$("to-sp"); if(tsp) tsp.onclick=()=>{ closeSheet(); openStorePage(wz); };
+  sheetEl().querySelectorAll("[data-padj]").forEach(b=>b.onclick=async()=>{ b.disabled=true;
+    const x=await api("decideAdj",{id:b.dataset.padj,approve:b.dataset.ok==="1"}); if(!x.ok){ toast(errText(x)); b.disabled=false; return; }
+    toast(b.dataset.ok==="1"?"Approved":"Rejected"); dropCaches(); S.days={}; const bb=await api("bootstrap"); if(bb.ok) S.boot=bb; await loadDay(S.date,true); rowSheet(date,wz); });
   if(can){
     $("af").querySelectorAll("[data-fill]").forEach(b=>b.onclick=()=>{ $("a-amt").value=b.dataset.fill; $("a-rsn").focus(); });
     $("af").onsubmit=async ev=>{ ev.preventDefault(); const btn=$("af").querySelector(".btn.primary"); btn.disabled=true; $("a-err").textContent="";
       const raw=$("a-amt").value.replace(/[$,\s]/g,""); const adj=raw===""?"":Number(raw);
-      const res=await api("saveAdj",{date,wz,adj,reason:$("a-rsn").value,note:$("a-note").value}); btn.disabled=false;
-      if(!res.ok){ $("a-err").textContent=errText(res); return; }
+      const ack=($("af").dataset.ack||"").split(",").filter(Boolean);
+      const typed={amt:$("a-amt").value,rsn:$("a-rsn").value,note:$("a-note").value};
+      const res=await api("saveAdj",{date,wz,adj,reason:typed.rsn,note:typed.note,ack,prev:{adj:r.adj,reason:r.adjReason,note:r.note}}); btn.disabled=false;
+      if(!res.ok){
+        if(res.error==="conflict"&&res.row){ const d=S.days[date]; if(d){ const k=d.rows.findIndex(x=>x.wz===wz); if(k>=0) d.rows[k]=res.row; }
+          await rowSheet(date,wz); if($("af")){ $("a-amt").value=typed.amt; $("a-rsn").value=typed.rsn; $("a-note").value=typed.note; $("a-err").textContent=errText(res)+(res.by?` (last change by ${res.by})`:""); } return; }
+        const box=$("a-err"); box.textContent=errText(res);
+        const why=res.error==="wrong_sign"?"sign":res.error==="use_split"?"split":"";
+        if(why){
+          const go=document.createElement("div"); go.className="quick";
+          if(why==="sign"&&typeof res.suggest==="number") go.innerHTML+=`<button type="button" data-use="${res.suggest.toFixed(2)}">Use ${money(res.suggest,1)} instead</button> `;
+          if(why==="split"&&$("cf")) go.innerHTML+=`<button type="button" data-tosplit>Go to Split</button> `;
+          go.innerHTML+=`<button type="button" data-anyway>Save anyway</button>`;
+          box.appendChild(go);
+          const u=go.querySelector("[data-use]"); if(u) u.onclick=()=>{ $("a-amt").value=u.dataset.use; box.textContent=""; };
+          const t=go.querySelector("[data-tosplit]"); if(t) t.onclick=()=>{ $("a-amt").value=""; $("a-rsn").value=""; box.textContent=""; $("cf").scrollIntoView({behavior:"smooth",block:"center"}); };
+          go.querySelector("[data-anyway]").onclick=()=>{ $("af").dataset.ack=[...ack,why].join(","); box.textContent=""; $("af").requestSubmit(); };
+        }
+        return; }
+      if(res.pending){ toast("Over $1,000: sent to an admin for approval"); dropCaches(); S.days={}; await loadDay(S.date,true); rowSheet(date,wz); return; }
       const d=S.days[date]; if(d){ const k=d.rows.findIndex(x=>x.wz===wz); if(k>=0) d.rows[k]=res.row; }
       toast("Saved"); dropCaches(); const b=await api("bootstrap"); if(b.ok) S.boot=b; writeCache(); render(); rowSheet(date,wz); };
   }
   const hr=await histInto(wz,date); const ab=$("alloc-box");
   if(ab&&hr&&hr.ok&&S.sel&&S.sel.wz===wz&&S.sel.date===date){ ab.innerHTML=allocHtml(r,hr.rows,hr.allocs); bindAlloc(r); }
+}
+function pendHtml(list){
+  if(!list.length) return "";
+  return `<div><div class="group-h"><h3>Waiting for admin approval</h3><span>${list.length}</span></div><div class="mini">${list.map(p=>`<div class="mini-r"><span>${esc(p.by)} · ${esc(p.reason)}</span><b class="num">${money(p.adj,1)}</b>
+    <small>${esc(p.note)}${S.me.isAdmin?`<br><span class="quick" style="display:inline-flex;gap:6px;margin-top:6px"><button type="button" data-padj="${esc(p.id)}" data-ok="1">Approve</button><button type="button" data-padj="${esc(p.id)}" data-ok="0">Reject</button></span>`:" · Not applied until an admin approves it"}</small></div>`).join("")}</div></div>`;
 }
 async function histInto(wz,date){
   S.hcache=S.hcache||{}; const r=S.hcache[wz]||await api("store",{wz,days:30}); if(r.ok) S.hcache[wz]=r; const box=$("h-box"); if(!box) return r;

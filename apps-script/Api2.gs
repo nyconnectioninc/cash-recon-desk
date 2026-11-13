@@ -271,7 +271,7 @@ function desk2Allocate_(me, b) {
   if (!deskScope_(me).allowed[wz]) return { ok: false, error: 'not_allowed' };
   var locks = desk2Locks_();
   if (locks[dep] || days.some(function (d) { return locks[d]; })) return { ok: false, error: 'day_locked' };
-  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  var lock = deskLock_(); if (!lock) return { ok: false, error: 'busy' };
   try {
     var sh = sheet_(TABS.LOG, LOG_HEADERS), v = sh.getDataRange().getValues(), idx = {};
     for (var i = 1; i < v.length; i++) if (String(v[i][1]) === wz) idx[normDate_(v[i][0])] = i;
@@ -312,7 +312,7 @@ function desk2UndoAlloc_(me, id) {
   if (!items.length) return { ok: false, error: 'not_found' };
   var locks = desk2Locks_();
   if (items.some(function (x) { return locks[x.date]; })) return { ok: false, error: 'day_locked' };
-  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  var lock = deskLock_(); if (!lock) return { ok: false, error: 'busy' };
   try {
     var sh = sheet_(TABS.LOG, LOG_HEADERS), v = sh.getDataRange().getValues(), tol = Number(getCfg_().TOLERANCE) || 5;
     items.forEach(function (x) {

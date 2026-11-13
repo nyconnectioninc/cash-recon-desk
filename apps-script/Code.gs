@@ -82,8 +82,7 @@ function promptReconDate() {
 
 // ───────────────────────── MAIN ─────────────────────────
 function runDaily() {
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(30000)) return;
+  if (!engineBegin_()) return;            // another engine run is still going
   try {
     var tz = Session.getScriptTimeZone();
     var now = new Date();
@@ -92,6 +91,7 @@ function runDaily() {
     var endHour = Number(cfg.RUN_END_HOUR) || 15, sendHour = Number(cfg.ALERT_SEND_HOUR) || 12;
     if (hour < 6 || hour >= endHour) return;                  // quiet outside the 6 AM – RUN_END_HOUR window
 
+    try { ensureHealthTrigger_(); } catch (e) { logRun('Health trigger: ' + e.message); }
     setupTabs();
     var props = PropertiesService.getScriptProperties();
     var sig0 = dataSig_();
@@ -133,7 +133,7 @@ function runDaily() {
     logRun('ERROR ' + e.message + '\n' + e.stack);
     MailApp.sendEmail(adminEmail_(), '❌ Cash Recon error', e.message + '\n\n' + e.stack);
   } finally {
-    lock.releaseLock();
+    engineEnd_();
   }
 }
 
@@ -370,11 +370,12 @@ function reconcileAndWrite_(bizDate) {
   if (result.assignments.length) {
     var byCode = {};
     result.assignments.forEach(function (a) { byCode[a.barcode] = a; });
-    var vals = brSheet.getRange(2, 1, br.length, 15).getValues();
+    var vals = brSheet.getRange(2, 1, br.length, 15).getValues(), lo = -1, hi = -1;
     for (var i = 0; i < vals.length; i++) {
       var a = byCode[vals[i][0]];
-      if (a) brSheet.getRange(i + 2, 13, 1, 3).setValues([[a.date, a.wz, a.note]]);
+      if (a) { vals[i][12] = a.date; vals[i][13] = a.wz; vals[i][14] = a.note; if (lo < 0) lo = i; hi = i; }
     }
+    if (lo >= 0) brSheet.getRange(lo + 2, 13, hi - lo + 1, 3).setValues(vals.slice(lo, hi + 1).map(function (r) { return [r[12], r[13], r[14]]; }));
   }
   upsertDailyLog_(bizDate, result.rows);
   logRun('Recon ' + bizDate + ': ' + JSON.stringify(result.summary));
@@ -527,22 +528,80 @@ function bagDate_(b, opt) {
 
 // ───────────────────────── DAILY LOG ─────────────────────────
 function upsertDailyLog_(bizDate, rows) {
-  var sh = sheet_(TABS.LOG, LOG_HEADERS);
-  var data = sh.getDataRange().getValues();
-  var idx = {};
-  for (var i = 1; i < data.length; i++) idx[normDate_(data[i][0]) + '|' + data[i][1]] = i;
-  var now = new Date(), tol = Number(getCfg_().TOLERANCE) || 5, appends = [];
-  rows.forEach(function (r) {
-    var key = bizDate + '|' + r.wz, existing = idx[key] !== undefined ? data[idx[key]] : null;
-    var manual = existing ? MANUAL_COLS.map(function (c) { return existing[c]; }) : ['', '', '', ''];
-    var adj = Number(manual[0]) || 0, fd = round2_(r.diff + adj);
-    var fs = adj ? (Math.abs(fd) <= tol ? 'RESOLVED (manual)' : r.status + ' (adj)') : r.status;
-    var row = [bizDate, r.wz, r.store, r.company, r.dm, r.rq, r.brinks, r.diff, r.status, r.bags, r.notes]
-      .concat(manual).concat([fd, fs, now]);
-    if (existing) sh.getRange(idx[key] + 1, 1, 1, row.length).setValues([row]);
-    else appends.push(row);
+  var sh = sheet_(TABS.LOG, LOG_HEADERS), tol = Number(getCfg_().TOLERANCE) || 5;
+  withSheetLock_(function () {
+    // Re-read inside the lock so a dashboard edit made while the recon was computing is kept, never overwritten.
+    var data = sh.getDataRange().getValues(), idx = {};
+    for (var i = 1; i < data.length; i++) idx[normDate_(data[i][0]) + '|' + data[i][1]] = i;
+    var now = new Date(), appends = [], touched = [];
+    rows.forEach(function (r) {
+      var key = bizDate + '|' + r.wz, at = idx[key], existing = at !== undefined ? data[at] : null;
+      var manual = existing ? MANUAL_COLS.map(function (c) { return existing[c]; }) : ['', '', '', ''];
+      var adj = Number(manual[0]) || 0, fd = round2_(r.diff + adj);
+      var fs = adj ? (Math.abs(fd) <= tol ? 'RESOLVED (manual)' : r.status + ' (adj)') : r.status;
+      var row = [bizDate, r.wz, r.store, r.company, r.dm, r.rq, r.brinks, r.diff, r.status, r.bags, r.notes]
+        .concat(manual).concat([fd, fs, now]);
+      if (existing) { data[at] = row; touched.push(at); } else appends.push(row);
+    });
+    if (touched.length) {
+      var lo = Math.min.apply(null, touched), hi = Math.max.apply(null, touched);
+      if (hi - lo + 1 <= touched.length * 3) sh.getRange(lo + 1, 1, hi - lo + 1, LOG_HEADERS.length).setValues(data.slice(lo, hi + 1).map(function (r) { return r.slice(0, LOG_HEADERS.length); }));
+      else touched.forEach(function (k) { sh.getRange(k + 1, 1, 1, LOG_HEADERS.length).setValues([data[k].slice(0, LOG_HEADERS.length)]); });
+    }
+    if (appends.length) sh.getRange(sh.getLastRow() + 1, 1, appends.length, appends[0].length).setValues(appends);
   });
-  if (appends.length) sh.getRange(sh.getLastRow() + 1, 1, appends.length, appends[0].length).setValues(appends);
+}
+
+/* ───── Locking: the dashboard and the engine share the script lock, but the engine only holds it for the
+   few seconds it writes Daily_Log. A separate "engine running" flag keeps two engine runs from overlapping. ───── */
+function withSheetLock_(fn) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(60000)) throw new Error('Daily_Log busy for 60 s (dashboard save in progress?)');
+  try { return fn(); } finally { lock.releaseLock(); }
+}
+function engineBegin_() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return false;
+  try {
+    var p = PropertiesService.getScriptProperties(), t = Number(p.getProperty('engine_busy')) || 0;
+    if (t && Date.now() - t < 7 * 60 * 1000) return false;          // a run started < 7 min ago is still going
+    p.setProperty('engine_busy', String(Date.now()));
+    p.setProperty('engine_started', String(Date.now()));
+    return true;
+  } finally { lock.releaseLock(); }
+}
+/** Daily 3:30 PM admin-only health check (installs itself on the first runDaily). Silent when all is well. */
+function ensureHealthTrigger_() {
+  var p = PropertiesService.getScriptProperties();
+  if (p.getProperty('health_trigger') === '1') return;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'healthCheck') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('healthCheck').timeBased().everyDays(1).atHour(15).nearMinute(30).create();
+  p.setProperty('health_trigger', '1');
+}
+function healthCheck() {
+  var p = PropertiesService.getScriptProperties(), tz = Session.getScriptTimeZone(), since = Date.now() - 24 * 3600 * 1000, issues = [];
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), target = addDays_(today, -1);
+  if (p.getProperty('alert_sent_' + target) !== '1') issues.push('The recon email for ' + target + ' has NOT gone out today. Check Run_Log, or run Cash Recon → Run now.');
+  var slow = JSON.parse(p.getProperty('engine_secs') || '[]').filter(function (x) { return x[0] >= since && x[1] > 240; });
+  if (slow.length) issues.push(slow.length + ' engine run(s) took over 4 minutes (longest ' + Math.max.apply(null, slow.map(function (x) { return x[1]; })) +
+    ' s). Close to the 6-minute limit: consider lowering RECHECK_DAYS.');
+  var busy = JSON.parse(p.getProperty('busy_log') || '[]').filter(function (t) { return t >= since; }), perHour = {};
+  busy.forEach(function (t) { var h = Utilities.formatDate(new Date(t), tz, 'h a'); perHour[h] = (perHour[h] || 0) + 1; });
+  var bad = Object.keys(perHour).filter(function (h) { return perHour[h] > 3; });
+  if (bad.length) issues.push('Dashboard saves had to wait/retry more than 3 times in an hour (' + bad.map(function (h) { return h + ': ' + perHour[h]; }).join(', ') +
+    '). Users may have seen "recon is updating".');
+  var pend = (typeof deskPending_ === 'function') ? deskPending_() : [];
+  if (pend.length) issues.push(pend.length + ' adjustment(s) over $1,000 are waiting for your approval in the Cash Recon Desk: ' +
+    pend.map(function (x) { return x.store + ' ' + x.date + ' ' + money_(x.adj) + ' (' + x.by + ')'; }).join('; '));
+  if (!issues.length) { logRun('Health check: all good'); return; }
+  logRun('Health check: ' + issues.length + ' issue(s)');
+  MailApp.sendEmail(adminEmail_(), '🩺 Cash Recon health: ' + issues.length + ' issue(s)', issues.map(function (x) { return '• ' + x; }).join('\n\n'));
+}
+function engineEnd_() {
+  var p = PropertiesService.getScriptProperties(), t0 = Number(p.getProperty('engine_started')) || Date.now();
+  p.deleteProperty('engine_busy');
+  var secs = Math.round((Date.now() - t0) / 1000), hist = JSON.parse(p.getProperty('engine_secs') || '[]');
+  hist.push([Date.now(), secs]); p.setProperty('engine_secs', JSON.stringify(hist.slice(-200)));
 }
 
 // ───────────────────────── ALERT ─────────────────────────
@@ -840,6 +899,9 @@ function netWindow_(dates) {
   var tol = Number(getCfg_().TOLERANCE) || 5;
   var map = loadStoreMap_();
   var sh = sheet_(TABS.LOG, LOG_HEADERS);
+  withSheetLock_(function () { netWindowLocked_(dates, tol, map, sh); });
+}
+function netWindowLocked_(dates, tol, map, sh) {
   var data = sh.getDataRange().getValues();
   var items = [], rowOf = {};
   for (var i = 1; i < data.length; i++) {
