@@ -1254,3 +1254,10 @@ function testMailRelay() {
     htmlBody: '<p>Test from the Cash Recon engine at ' + new Date() + '.</p>' });
   logRun('testMailRelay sent via ' + via);
 }
+
+/** Run once from the editor: asks Google to grant every scope the engine needs (incl. "Connect to an external service",
+ *  used to send the recon email through the Outlook relay). Then sends a test email through the relay. */
+function authorizeMail() {
+  ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
+  testMailRelay();
+}
