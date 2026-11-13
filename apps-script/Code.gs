@@ -1267,3 +1267,9 @@ function authorizeMail() {
   ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
   testMailRelay();
 }
+
+/** Manual: re-send yesterday's recon email (and, in TEST_MODE, the store-manager preview) as a sample. Changes no data. */
+function sendSampleRecon() {
+  var tz = Session.getScriptTimeZone();
+  sendAlert_(addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1));
+}
