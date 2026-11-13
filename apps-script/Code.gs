@@ -93,14 +93,18 @@ function runDaily() {
     if (hour < 6 || hour >= endHour) return;                  // quiet outside the 6 AM – RUN_END_HOUR window
 
     setupTabs();
-    ingestAll();
-
     var props = PropertiesService.getScriptProperties();
+    var sig0 = dataSig_();
+    ingestAll();
+    var changed = dataSig_() !== sig0 || props.getProperty('recon_sig') !== dataSig_();
     var today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
     var target = addDays_(today, -1);
     var haveRQ = rqDates_().indexOf(target) >= 0;
     var haveBR = brinksReportDates_().indexOf(today) >= 0;
 
+    // Once yesterday's email is out, only re-run the (slow, lock-holding) recon when new data actually arrived,
+    // so the dashboard's saves aren't blocked by a 6-minute run every 15 minutes.
+    if (haveRQ && haveBR && props.getProperty('alert_sent_' + target) === '1' && !changed) return;
     if (haveRQ && haveBR) {
       // Yesterday first, so the email never waits on the older re-checks (each day takes ~1-3 min with ~100 stores
       // and a run is capped at 6 min). Older days are re-checked with whatever time is left; the next run continues.
@@ -114,6 +118,7 @@ function runDaily() {
         var d = addDays_(target, -i); reconcileAndWrite_(d); win.push(d);
       }
       if (win.length > 1) netWindow_(win);
+      if (win.length >= n) props.setProperty('recon_sig', dataSig_());   // all days done for this data
     } else if (hour >= Number(cfg.MISSING_FILE_ALERT_HOUR) && props.getProperty('missing_sent_' + target) !== '1') {
       var miss = [];
       if (!haveRQ) miss.push('RQ Cash Audit file for ' + target + ' (check the Mac mini — ~/Library/Logs/rq-pull.log)');
@@ -734,6 +739,12 @@ function replaceRowsByDate_(tab, headers, dateCol, date, newRows) {
   sh.getRange(1, 1, all.length, headers.length).setValues(all.map(function (r) { return r.slice(0, headers.length); }));
 }
 
+/** Cheap fingerprint of the recon inputs (row counts); changes when new RQ / Brinks / ACH rows land. */
+function dataSig_() {
+  var ss = ss_();
+  return ['RQ', 'BR'].map(function (k) { var sh = ss.getSheetByName(TABS[k]); return sh ? sh.getLastRow() : 0; }).join('|') +
+    '|' + (PropertiesService.getScriptProperties().getProperty('brinks_report_dates') || '').length;
+}
 function rqDates_() { return readTab_(TABS.RQ).map(function (r) { return normDate_(r[0]); }).filter(function (d, i, a) { return a.indexOf(d) === i; }); }
 function brinksReportDates_() { return JSON.parse(PropertiesService.getScriptProperties().getProperty('brinks_report_dates') || '[]'); }
 function addBrinksReportDate_(d) {
