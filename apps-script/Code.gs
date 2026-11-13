@@ -1326,3 +1326,34 @@ function achBagPreview() {
   console.log('ACH bag rows on neither Brinks report: ' + bags.length + ' · $' + round2_(bags.reduce(function (s, r) { return s + r[7]; }, 0)));
   bags.forEach(function (r) { console.log([r[0], r[1], r[4], 'sid=' + r[3], 'loc#=' + r[17], '$' + r[7]].join(' | ')); });
 }
+
+/** Manual, read-only: go-live readiness for turning TEST_MODE off (last N days of Daily_Log + Store Map contacts). */
+function readinessReport(days) {
+  var n = Number(days) || 7, tz = Session.getScriptTimeZone(), map = loadStoreMap_();
+  var end = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), start = addDays_(end, -(n - 1));
+  var st = {};
+  readTab_(TABS.LOG).forEach(function (r) {
+    var d = normDate_(r[0]); if (d < start || d > end) return;
+    var w = String(r[1]), s = st[w] = st[w] || { rqDays: 0, brDays: 0, rq: 0, br: 0, open: 0 };
+    if ((Number(r[5]) || 0) > 1) { s.rqDays++; s.rq += Number(r[5]); }
+    if ((Number(r[6]) || 0) > 1) { s.brDays++; s.br += Number(r[6]); }
+    if (/MISSING|SHORT|OVER|BRINKS ONLY/.test(String(r[16] || r[8])) && !/RESOLVED/.test(String(r[16]))) s.open++;
+  });
+  var noBrinks = [], partial = [], noSM = [], noDM = [], noRQ = [];
+  Object.keys(map.byWZ).sort().forEach(function (w) {
+    var m = map.byWZ[w]; if (!m.active) return;
+    var s = st[w] || { rqDays: 0, brDays: 0, rq: 0, br: 0, open: 0 }, label = w + ' ' + m.name;
+    if (s.rqDays && !s.brDays) noBrinks.push(label + ' (RQ $' + round2_(s.rq) + ' over ' + s.rqDays + 'd, Brinks $0)');
+    else if (s.rqDays && s.brDays < s.rqDays / 2) partial.push(label + ' (Brinks ' + s.brDays + '/' + s.rqDays + ' cash days)');
+    if (!s.rqDays && !s.brDays) noRQ.push(label);
+    if (!m.smEmail) noSM.push(label + (s.open ? ' [' + s.open + ' open]' : ''));
+    if (!m.dmEmail) noDM.push(label);
+  });
+  var out = ['Readiness ' + start + ' → ' + end + ' (' + Object.keys(map.byWZ).filter(function (w) { return map.byWZ[w].active; }).length + ' active stores)',
+    'NO BRINKS DATA (' + noBrinks.length + '): ' + noBrinks.join('; '),
+    'PARTIAL BRINKS (' + partial.length + '): ' + partial.join('; '),
+    'NO RQ + NO BRINKS (' + noRQ.length + '): ' + noRQ.join('; '),
+    'NO SM EMAIL (' + noSM.length + '): ' + noSM.join('; '),
+    'NO DM EMAIL (' + noDM.length + '): ' + noDM.join('; ')];
+  console.log(out.join('\n'));
+}
