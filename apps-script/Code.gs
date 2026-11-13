@@ -118,7 +118,7 @@ function runDaily() {
         var d = addDays_(target, -i); reconcileAndWrite_(d); win.push(d);
       }
       if (win.length > 1) netWindow_(win);
-      if (win.length >= n) props.setProperty('recon_sig', dataSig_());   // all days done for this data
+      props.setProperty('recon_sig', dataSig_());   // this data is reconciled; next full run only when new rows land
     } else if (hour >= Number(cfg.MISSING_FILE_ALERT_HOUR) && props.getProperty('missing_sent_' + target) !== '1') {
       var miss = [];
       if (!haveRQ) miss.push('RQ Cash Audit file for ' + target + ' (check the Mac mini — ~/Library/Logs/rq-pull.log)');
