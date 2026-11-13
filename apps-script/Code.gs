@@ -102,14 +102,18 @@ function runDaily() {
     var haveBR = brinksReportDates_().indexOf(today) >= 0;
 
     if (haveRQ && haveBR) {
-      var n = Number(cfg.RECHECK_DAYS) || 3;
-      var win = [];
-      for (var i = n - 1; i >= 0; i--) { win.push(addDays_(target, -i)); reconcileAndWrite_(addDays_(target, -i)); }
-      netWindow_(win);
-      if (hour >= sendHour && props.getProperty('alert_sent_' + target) !== '1') {   // recon refreshes all morning; email waits for ALERT_SEND_HOUR
-        sendAlert_(target);
-        props.setProperty('alert_sent_' + target, '1');
+      // Yesterday first, so the email never waits on the older re-checks (each day takes ~1-3 min with ~100 stores
+      // and a run is capped at 6 min). Older days are re-checked with whatever time is left; the next run continues.
+      var t0 = now.getTime(), n = Number(cfg.RECHECK_DAYS) || 3, win = [target];
+      reconcileAndWrite_(target);
+      var due = hour >= sendHour && props.getProperty('alert_sent_' + target) !== '1';
+      if (due) netWindow_([target]);
+      if (due) { sendAlert_(target); props.setProperty('alert_sent_' + target, '1'); }   // email waits for ALERT_SEND_HOUR
+      for (var i = 1; i < n; i++) {
+        if (Date.now() - t0 > 240000) { logRun('Re-check of older days deferred to the next run (time limit)'); break; }
+        var d = addDays_(target, -i); reconcileAndWrite_(d); win.push(d);
       }
+      if (win.length > 1) netWindow_(win);
     } else if (hour >= Number(cfg.MISSING_FILE_ALERT_HOUR) && props.getProperty('missing_sent_' + target) !== '1') {
       var miss = [];
       if (!haveRQ) miss.push('RQ Cash Audit file for ' + target + ' (check the Mac mini — ~/Library/Logs/rq-pull.log)');
