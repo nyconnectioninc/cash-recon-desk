@@ -950,6 +950,7 @@ function ingestBrinksImports_() {
       upsertBrinks_(parsed);
       activateNewInstalls_(parsed);
       props.setProperty(key, '1');
+      addBrinksReportDate_(rd);
       logRun('Brinks import ' + f.getName() + ': ' + parsed.length + ' rows');
     } catch (e) { logRun('Brinks import ' + f.getName() + ' skipped: ' + e.message); }
   }
@@ -1077,13 +1078,14 @@ var ACH_HEADERS = ['Key', 'Business Day', 'Customer', 'Location Name', 'Bag / De
 
 function ingestACH() {
   var cfg = getCfg_(), props = PropertiesService.getScriptProperties(), tz = Session.getScriptTimeZone(), got = 0;
-  var take = function (vals, src) { var p = parseACHRows_(vals, src); got += upsertACH_(p); logRun('ACH report ' + src + ': ' + p.length + ' rows'); };
+  var take = function (vals, src, d) { var p = parseACHRows_(vals, src); got += upsertACH_(p); if (p.length && d) addBrinksReportDate_(d); logRun('ACH report ' + src + ': ' + p.length + ' rows'); };
   if (cfg.ACH_QUERY) GmailApp.search(cfg.ACH_QUERY).forEach(function (t) {
     t.getMessages().forEach(function (msg) {
       if (props.getProperty('ach_' + msg.getId())) return;
       try {
         msg.getAttachments().forEach(function (att) {
-          if (/\.xlsx?$/i.test(att.getName())) take(xlsxToValues_(att.copyBlob(), att.getName()), 'email ' + Utilities.formatDate(msg.getDate(), tz, 'yyyy-MM-dd') + ' ' + att.getName());
+          if (/\.xlsx?$/i.test(att.getName())) take(xlsxToValues_(att.copyBlob(), att.getName()), 'email ' + Utilities.formatDate(msg.getDate(), tz, 'yyyy-MM-dd') + ' ' + att.getName(),
+            Utilities.formatDate(msg.getDate(), tz, 'yyyy-MM-dd'));
         });
         props.setProperty('ach_' + msg.getId(), '1');
       } catch (e) {
@@ -1102,7 +1104,7 @@ function ingestACH() {
       var vals;
       if (gs) { var s2 = SpreadsheetApp.openById(f.getId()); if (s2.getSpreadsheetTimeZone() !== tz) s2.setSpreadsheetTimeZone(tz); vals = s2.getSheets()[0].getDataRange().getValues(); }
       else vals = xlsxToValues_(f.getBlob(), f.getName());
-      take(vals, f.getName());
+      take(vals, f.getName(), Utilities.formatDate(f.getDateCreated(), tz, 'yyyy-MM-dd'));
       props.setProperty(key, '1');
     } catch (e) { logRun('ACH file ' + f.getName() + ' skipped: ' + e.message); }
   }
@@ -1175,7 +1177,30 @@ function achBackupRows_(ach, br, map, today, tz) {
       'ACH backup (smart safe): ACH $' + T[k] + ' vs Device Activity $' + (S[k] || 0)]);
     if (live && wz) activate[wz] = loc;
   });
-  return { rows: rows, activate: activate };
+  // Bags (physical drops) that are on the ACH report but on neither the Device Activity nor the Deposit Report
+  var haveCode = {}; br.forEach(function (b) { haveCode[String(b[0]).trim()] = 1; });
+  var locNumOf = {}; Object.keys(map.byLocNum || {}).forEach(function (n) { locNumOf[map.byLocNum[n]] = n; });
+  var bags = {};
+  ach.forEach(function (r) {
+    var bag = String(r[4]).trim(), amt = Number(r[9]) || 0, act = String(r[6]);
+    if (!bag || isDev(bag) || /variance/i.test(act) || !/credit/i.test(act) || amt <= 0) return;
+    if (haveCode[bag] && !bags[bag]) return;                                     // already on Device Activity / Deposit Report
+    var b0 = bags[bag] = bags[bag] || { bag: bag, d: ymd_(r[1]), loc: String(r[3]).replace(/\s+/g, ' ').trim(), by: String(r[5]).trim(), amt: 0 };
+    b0.amt = round2_(b0.amt + amt);
+  });
+  var achBags = 0;
+  Object.keys(bags).forEach(function (k) {
+    var b = bags[k];
+    if (haveCode[b.bag]) return;
+    var m = b.loc.match(/\bWZ\d{3,4}[A-Z]?\b/i), hits = Object.keys(map.byWZ).filter(function (w) { return nl(map.byWZ[w].location) === nl(b.loc); });
+    var wz = m ? m[0].toUpperCase() : hits.length === 1 ? hits[0] : '';
+    var sid = m ? wz : hits.length ? map.byWZ[hits[0]].brinksId : b.loc.replace(/^Verizon Wireless\s*/i, '');
+    var locNum = wz && !m ? (locNumOf[wz] || '') : '';
+    rows.push([b.bag, b.d, Utilities.parseDate(b.d + ' 12:00', tz, 'yyyy-MM-dd HH:mm'), sid, b.loc, b.by, 'ACH', b.amt,
+      '', '', '', '', '', '', '', today, 'ach-bag', locNum, 'Bag (ACH report only)']);
+    achBags++;
+  });
+  return { rows: rows, activate: activate, achBags: achBags };
 }
 
 function achBackfill_() {
@@ -1183,8 +1208,9 @@ function achBackfill_() {
   var tz = Session.getScriptTimeZone(), today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
   var res = achBackupRows_(ach, readTab_(TABS.BR), loadStoreMap_(), today, tz);
   if (res.rows.length) upsertBrinks_(res.rows);
-  var live = res.rows.filter(function (r) { return r[6] === 'ACH'; });
-  logRun('ACH backup: ' + live.length + ' store-days, $' + round2_(live.reduce(function (s, r) { return s + r[7]; }, 0)) + ' not on Device Activity');
+  var live = res.rows.filter(function (r) { return r[6] === 'ACH' && r[16] === 'ach-backup'; });
+  logRun('ACH backup: ' + live.length + ' smart-safe store-days, $' + round2_(live.reduce(function (s, r) { return s + r[7]; }, 0)) + ' not on Device Activity; ' +
+    (res.achBags || 0) + ' bag(s) only on the ACH report added');
   activateFromACH_(res.activate);
 }
 
@@ -1272,4 +1298,31 @@ function authorizeMail() {
 function sendSampleRecon() {
   var tz = Session.getScriptTimeZone();
   sendAlert_(addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1));
+}
+
+/** Manual: for the last N days, how many store-days have Brinks money from each report (Device Activity / Deposit Report / ACH only). */
+function brinksCoverage(days) {
+  var n = Number(days) || 5, tz = Session.getScriptTimeZone(), map = loadStoreMap_(), br = readTab_(TABS.BR);
+  var end = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), out = [];
+  for (var i = n - 1; i >= 0; i--) {
+    var d = addDays_(end, -i), src = {};
+    br.forEach(function (b) {
+      if (normDate_(b[12]) !== d || brSkip_(b)) return;
+      var w = String(b[13] || '?'), s = String(b[16]), k = s === 'ach-bag' || s === 'ach-backup' ? 'ACH' : /^import:/.test(s) ? 'Import' : String(b[18] || '') || /^SD-/.test(String(b[0])) ? 'DeviceActivity' : 'DepositReport';
+      (src[w] = src[w] || {})[k] = 1;
+    });
+    var c = { DeviceActivity: 0, DepositReport: 0, ACH: 0, Import: 0 }, only = [];
+    Object.keys(src).forEach(function (w) { var ks = Object.keys(src[w]); ks.forEach(function (k) { c[k] = (c[k] || 0) + 1; }); if (ks.length === 1 && ks[0] === 'ACH') only.push(w); });
+    out.push(d + ': ' + Object.keys(src).length + ' stores with Brinks money · ' + JSON.stringify(c) + (only.length ? ' · ACH-only: ' + only.join(', ') : ''));
+  }
+  logRun('Brinks coverage\n' + out.join('\n'));
+}
+
+/** Manual, read-only: which ACH-report bags would be added because they're on neither Brinks report. */
+function achBagPreview() {
+  var tz = Session.getScriptTimeZone(), today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var res = achBackupRows_(readTab_(ACH_TAB), readTab_(TABS.BR), loadStoreMap_(), today, tz);
+  var bags = res.rows.filter(function (r) { return r[16] === 'ach-bag'; });
+  console.log('ACH bag rows on neither Brinks report: ' + bags.length + ' · $' + round2_(bags.reduce(function (s, r) { return s + r[7]; }, 0)));
+  bags.forEach(function (r) { console.log([r[0], r[1], r[4], 'sid=' + r[3], 'loc#=' + r[17], '$' + r[7]].join(' | ')); });
 }
