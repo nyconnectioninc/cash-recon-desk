@@ -123,7 +123,7 @@ function runDaily() {
       var miss = [];
       if (!haveRQ) miss.push('RQ Cash Audit file for ' + target + ' (check the Mac mini — ~/Library/Logs/rq-pull.log)');
       if (!haveBR) miss.push('Brinks Deposit Report email for ' + today);
-      MailApp.sendEmail(adminEmail_(), '⚠️ Cash Recon blocked — missing input for ' + target,
+      adminMail_( '⚠️ Cash Recon blocked — missing input for ' + target,
         'The recon for ' + target + ' could not run because these inputs are missing:\n\n• ' + miss.join('\n• ') +
         '\n\nIt will run automatically as soon as they arrive (checks every 15 min until ' + endHour + ':00; the recon email goes out at ' + sendHour + ':00 or as soon as inputs arrive after that), or use Cash Recon → Run now.');
       props.setProperty('missing_sent_' + target, '1');
@@ -131,7 +131,7 @@ function runDaily() {
     }
   } catch (e) {
     logRun('ERROR ' + e.message + '\n' + e.stack);
-    MailApp.sendEmail(adminEmail_(), '❌ Cash Recon error', e.message + '\n\n' + e.stack);
+    adminMail_( '❌ Cash Recon error', e.message + '\n\n' + e.stack);
   } finally {
     engineEnd_();
   }
@@ -200,7 +200,7 @@ function ingestRQ() {
       if (!props.getProperty('rqbad_' + key)) {
         props.setProperty('rqbad_' + key, '1');
         try {
-          MailApp.sendEmail({ to: adminEmail_(), subject: '⚠️ RQ file rejected — ' + f.getName(),
+          sendMail_({ to: adminEmail_(), subject: '⚠️ RQ file rejected — ' + f.getName(),
             htmlBody: '<p>The RQ Cash Audit file <b>' + f.getName() + '</b> was <b>not imported</b>: ' + bad + '.</p>' +
               '<p>Nothing was overwritten. Most likely a custom Cash Audit Trail run in Hub got picked up. Fix: in Hub re-run the ' +
               '"Yesterday · all stores · CASHOUT" report, export it, name it <code>' + f.getName() + '</code> and replace the file in ' +
@@ -595,7 +595,7 @@ function healthCheck() {
     pend.map(function (x) { return x.store + ' ' + x.date + ' ' + money_(x.adj) + ' (' + x.by + ')'; }).join('; '));
   if (!issues.length) { logRun('Health check: all good'); return; }
   logRun('Health check: ' + issues.length + ' issue(s)');
-  MailApp.sendEmail(adminEmail_(), '🩺 Cash Recon health: ' + issues.length + ' issue(s)', issues.map(function (x) { return '• ' + x; }).join('\n\n'));
+  adminMail_( '🩺 Cash Recon health: ' + issues.length + ' issue(s)', issues.map(function (x) { return '• ' + x; }).join('\n\n'));
 }
 function engineEnd_() {
   var p = PropertiesService.getScriptProperties(), t0 = Number(p.getProperty('engine_started')) || Date.now();
@@ -766,6 +766,12 @@ function getCfg_() {
 }
 /** TEST_MODE is ON unless explicitly FALSE/NO/OFF/0 — fails safe (admin-only) on any odd value. */
 function isTest_(cfg) { return !/^(false|no|off|0)$/i.test(String(cfg.TEST_MODE).trim()); }
+/** Admin alert (plain text) through the same Outlook relay as the recon email; Gmail if the relay is down. */
+function adminMail_(subject, text) {
+  var esc = String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return sendMail_({ to: adminEmail_(), subject: subject, body: String(text || ''),
+    htmlBody: '<div style="font-family:Arial,sans-serif;font-size:14px;white-space:pre-wrap">' + esc + '</div>' });
+}
 function adminEmail_() { return getCfg_().ADMIN_EMAIL || Session.getEffectiveUser().getEmail(); }
 
 function loadStoreMap_() {
@@ -972,7 +978,7 @@ function activateNewInstalls_(parsed) {
   if (!done.length) return;
   logRun('New Brinks installs activated: ' + done.join(', '));
   try {
-    MailApp.sendEmail(adminEmail_(), 'Cash Recon: ' + done.length + ' new Brinks install(s) activated',
+    adminMail_( 'Cash Recon: ' + done.length + ' new Brinks install(s) activated',
       'These stores made their first Brinks deposit and are now in the daily recon:\n\n' + done.join('\n') +
       '\n\nFill in DM / Store Manager on the Store Map so they get the right alerts.');
   } catch (e) { logRun('Install email failed: ' + e.message); }
@@ -1201,7 +1207,7 @@ function activateFromACH_(activate) {
   if (!done.length) return;
   logRun('Stores activated from ACH report: ' + done.join(', '));
   try {
-    MailApp.sendEmail(adminEmail_(), 'Cash Recon: ' + done.length + ' store(s) activated from the ACH report',
+    adminMail_( 'Cash Recon: ' + done.length + ' store(s) activated from the ACH report',
       'These stores have smart-safe credits on the Brinks ACH report but are not on the scheduled Brinks report yet. They are now in the daily recon using ACH data:\n\n' +
       done.join('\n') + '\n\nAsk Brinks to add them to the scheduled Device Activity report.');
   } catch (e) { logRun('ACH activation email failed: ' + e.message); }

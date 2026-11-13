@@ -378,7 +378,7 @@ function desk2RequestAccess_(b) {
   sh.appendRow([email, name.slice(0, 80), String(b.title || '').slice(0, 80), String(b.wants || '').slice(0, 120), reason.slice(0, 500), new Date(), 'Pending', '', '', '', '']);
   var admins = ss_().getSheetByName(DESK.USERS).getDataRange().getValues().slice(1)
     .filter(function (r) { return String(r[2]) === 'Admin' && deskTrue_(r[4]); }).map(function (r) { return deskEmail_(r[0]); });
-  if (admins.length) MailApp.sendEmail({ to: admins.join(','), subject: DESK.NAME + ': access request from ' + name,
+  if (admins.length) sendMail_({ to: admins.join(','), subject: DESK.NAME + ': access request from ' + name,
     htmlBody: '<div style="font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:15px">' +
       '<p><b>' + name + '</b> (' + email + ') asked for access.</p><p>Title: ' + (b.title || '—') + '<br>Wants to see: ' + (b.wants || '—') + '<br>Reason: ' + reason + '</p>' +
       '<p><a href="' + DESK2.SITE + '">Open Cash Recon Desk → People &amp; Access</a> to approve or deny.</p></div>' });
@@ -402,7 +402,7 @@ function desk2Decide_(me, b) {
     sh.getRange(i + 1, 7, 1, 5).setValues([[status, me.name, new Date(), b.role || '', b.scope || '']]);
     if (status === 'Approved') {
       deskSaveUser_(me, { email: email, name: v[i][1], role: b.role, scope: b.scope, active: true });
-      MailApp.sendEmail({ to: email, subject: 'You have access to ' + DESK.NAME,
+      sendMail_({ to: email, subject: 'You have access to ' + DESK.NAME,
         htmlBody: '<div style="font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:15px"><p>Hi ' + String(v[i][1]).split(' ')[0] + ',</p>' +
           '<p>Your access to ' + DESK.NAME + ' was approved (' + (b.role || 'Viewer') + ').</p><p><a href="' + DESK2.SITE + '">Sign in here</a> with this email. A code is emailed each time.</p></div>' });
     }

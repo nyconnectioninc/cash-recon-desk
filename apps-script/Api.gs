@@ -289,7 +289,7 @@ function deskSaveAdj_(me, b, approved) {
           var id = 'PA-' + Utilities.getUuid().slice(0, 8);
           desk2Tab_(ADJ_RULES.PENDING, ADJ_RULES.PENDING_H).appendRow([id, date, wz, cur.store, a, reason, note, me.name + ' <' + me.email + '>', new Date(), 'Pending', '', '']);
           deskLog_(me, date, wz, cur.store, 'Adjustment requested ' + money_(a), [reason, note].filter(String).join(' — '));
-          try { MailApp.sendEmail(adminEmail_(), 'Cash Recon: approve ' + money_(a) + ' adjustment — ' + cur.store + ' ' + date,
+          try { adminMail_( 'Cash Recon: approve ' + money_(a) + ' adjustment — ' + cur.store + ' ' + date,
             me.name + ' asked for a ' + money_(a) + ' adjustment on ' + cur.store + ' (' + wz + ') for ' + date + '.\n\nReason: ' + reason +
             '\nNote: ' + note + '\n\nApprove or reject it in the Cash Recon Desk (open the store for that day): ' + DESK2.SITE); } catch (e) {}
           return { ok: true, pending: true, id: id, row: cur };
