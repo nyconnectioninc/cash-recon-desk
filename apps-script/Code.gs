@@ -92,6 +92,12 @@ function runDaily() {
     if (hour < 6 || hour >= endHour) return;                  // quiet outside the 6 AM – RUN_END_HOUR window
 
     try { ensureHealthTrigger_(); } catch (e) { logRun('Health trigger: ' + e.message); }
+    // Config SEND_TO_DMS_NOW = yyyy-MM-dd → send that day's recon to the live list once (DMs only, no SM emails), even in TEST_MODE
+    var dmDay = normDate_(cfg.SEND_TO_DMS_NOW || ''), p0 = PropertiesService.getScriptProperties();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dmDay) && p0.getProperty('dm_sent_' + dmDay) !== '1') {
+      p0.setProperty('dm_sent_' + dmDay, '1');
+      sendAlert_(dmDay, { forceLive: true, skipStores: true });
+    }
     setupTabs();
     var props = PropertiesService.getScriptProperties();
     var sig0 = dataSig_();
