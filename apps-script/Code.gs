@@ -1357,3 +1357,32 @@ function readinessReport(days) {
     'NO DM EMAIL (' + noDM.length + '): ' + noDM.join('; ')];
   console.log(out.join('\n'));
 }
+
+/** Manual, read-only: active stores that are missing from recent RQ cash audit files — when each was last in RQ,
+ *  and whether Brinks still shows deposits for them (deposits but no RQ = the RQ export is leaving the store out). */
+function rqCoverage(days) {
+  var n = Number(days) || 14, tz = Session.getScriptTimeZone(), map = loadStoreMap_();
+  var end = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), start = addDays_(end, -(n - 1));
+  var fileDays = {}, rqDays = {}, rqLast = {}, rqName = {};
+  readTab_(TABS.RQ).forEach(function (r) {
+    var d = normDate_(r[0]), w = String(r[1]).trim(); if (!w) return;
+    if (!rqLast[w] || d > rqLast[w]) rqLast[w] = d;
+    rqName[w] = String(r[2]);
+    if (d >= start && d <= end) { fileDays[d] = 1; (rqDays[w] = rqDays[w] || {})[d] = 1; }
+  });
+  var brDays = {}, brLast = {};
+  readTab_(TABS.BR).forEach(function (b) {
+    var w = String(b[13] || '').trim(), d = normDate_(b[12]); if (!w || !d || brSkip_(b)) return;
+    if (!brLast[w] || d > brLast[w]) brLast[w] = d;
+    if (d >= start && d <= end && (Number(b[7]) || 0) > 1) (brDays[w] = brDays[w] || {})[d] = 1;
+  });
+  var nFiles = Object.keys(fileDays).length, out = ['RQ coverage ' + start + ' → ' + end + ' (' + nFiles + ' RQ files loaded)'];
+  Object.keys(map.byWZ).sort().forEach(function (w) {
+    var m = map.byWZ[w]; if (!m.active) return;
+    var rd = Object.keys(rqDays[w] || {}).length, bd = Object.keys(brDays[w] || {}).length;
+    if (rd >= nFiles - 1) return;
+    out.push(w + ' ' + m.name + ': in RQ ' + rd + '/' + nFiles + ' days (last ' + (rqLast[w] || 'never') + (rqName[w] ? ', as "' + rqName[w] + '"' : '') +
+      ') · Brinks deposits ' + bd + ' days (last ' + (brLast[w] || 'never') + ')');
+  });
+  console.log(out.join('\n'));
+}
