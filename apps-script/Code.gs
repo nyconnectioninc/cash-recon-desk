@@ -605,8 +605,9 @@ function engineEnd_() {
 }
 
 // ───────────────────────── ALERT ─────────────────────────
-function sendAlert_(bizDate) {
-  var cfg = getCfg_();
+function sendAlert_(bizDate, opts) {
+  opts = opts || {};
+  var cfg = getCfg_(), test = isTest_(cfg) && !opts.forceLive;
   var log = readTab_(TABS.LOG).filter(function (r) { return normDate_(r[0]) === bizDate; });
   var groups = { 'MISSING DEPOSIT': [], 'SHORT': [], 'OVER': [], 'BRINKS ONLY': [], 'MINOR': [], 'NETTED': [] };
   var matched = 0, total = 0;
@@ -637,7 +638,7 @@ function sendAlert_(bizDate) {
   var subj = '💰 Cash Recon ' + day + ' — ' + groups['MISSING DEPOSIT'].length + ' missing · ' +
     (groups.SHORT.length + groups.OVER.length) + ' variance · ' + matched + '/' + total + ' matched';
   var html = '<div style="font:14px Arial;color:#202124">' +
-    (isTest_(cfg) ? '<p style="background:#fff3cd;padding:8px">TEST MODE — this alert went to the admin only.</p>' : '') +
+    (test ? '<p style="background:#fff3cd;padding:8px">TEST MODE — this alert went to the admin only.</p>' : '') +
     '<p><b>' + matched + ' of ' + total + '</b> stores matched for <b>' + day + '</b>. Bags dropped the next morning are counted for the prior day; late bags update this log automatically.</p>' +
     table('❌ Missing deposit', '#c5221f', groups['MISSING DEPOSIT']) +
     table('⚠️ Short', '#e37400', groups.SHORT) +
@@ -650,11 +651,12 @@ function sendAlert_(bizDate) {
   var smap = loadStoreMap_(), dms = [];
   log.forEach(function (r) { var s = smap.byWZ[r[1]]; if (s && s.dmEmail) dms.push(s.dmEmail); });
   var live = uniq([adminEmail_(), cfg.RECON_TEAM || ''].concat(dms, [cfg.EXTRA_ALERT_TO || '']));
-  var to = isTest_(cfg) ? uniq([adminEmail_(), cfg.RECON_TEAM || '']) : live;
-  if (isTest_(cfg)) html = html.replace('TEST MODE — this alert went to the admin only.</p>',
+  var to = test ? uniq([adminEmail_(), cfg.RECON_TEAM || '']) : live;
+  if (test) html = html.replace('TEST MODE — this alert went to the admin only.</p>',
     'TEST MODE — this alert went to the admin only.<br><span style="font-size:12px">When live it goes to ' + live.length + ' people: ' + live.join(', ') + '</span></p>');
-  var via = sendMail_({ to: to.join(','), subject: subj, htmlBody: html });
-  logRun('Alert sent for ' + bizDate + ' via ' + via + ' to ' + to.join(','));
+  var via = sendMail_({ to: to.join(','), subject: subj, htmlBody: html, replyTo: test ? '' : adminEmail_() });
+  logRun('Alert sent for ' + bizDate + ' via ' + via + ' to ' + to.join(',') + (opts.forceLive ? ' (manual DM send)' : ''));
+  if (opts.skipStores) return;
   try { sendStoreAlerts_(bizDate, log, cfg, day, money); } catch (e) { logRun('Store-manager alerts failed: ' + e); }
 }
 
@@ -1385,4 +1387,11 @@ function rqCoverage(days) {
       ') · Brinks deposits ' + bd + ' days (last ' + (brLast[w] || 'never') + ')');
   });
   console.log(out.join('\n'));
+}
+
+/** Manual: send yesterday's recon email to the live list (DMs + recon team) even while TEST_MODE is on.
+ *  Store-manager emails are NOT sent; TEST_MODE stays as it is. */
+function sendReconToDMs() {
+  var tz = Session.getScriptTimeZone();
+  sendAlert_(addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), { forceLive: true, skipStores: true });
 }
