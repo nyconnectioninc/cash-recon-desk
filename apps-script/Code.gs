@@ -625,7 +625,12 @@ var EMAIL_LOGO = 'https://nyconnectioninc.github.io/cash-recon-desk/email-logo.p
 function reportTimes_(bizDate) {
   var p = PropertiesService.getScriptProperties(), tz = Session.getScriptTimeZone(), rd = addDays_(bizDate, 1);
   var br = Number(p.getProperty('br_recv_' + rd)) || 0, rq = Number(p.getProperty('rq_recv_' + bizDate)) || 0;
-  if (!br || !rq) readTab_(TABS.RUN).forEach(function (r) {
+  var tail = function () {   // only the newest ~1,500 Run_Log rows (the full tab is too large to read in one call)
+    var sh = ss_().getSheetByName(TABS.RUN); if (!sh) return [];
+    var last = sh.getLastRow(), n = Math.min(1500, last - 1);
+    return n > 0 ? sh.getRange(last - n + 1, 1, n, 2).getValues() : [];
+  };
+  if (!br || !rq) tail().forEach(function (r) {
     var t = r[0] instanceof Date ? r[0].getTime() : 0, m = String(r[1]);
     if (!t) return;
     if (!br && m.indexOf('Brinks ingested (email ' + rd + ')') === 0 && t > br) br = t;
