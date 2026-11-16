@@ -665,7 +665,7 @@ function sendAlert_(bizDate, opts) {
   var smap = loadStoreMap_(), dms = [];
   log.forEach(function (r) { var s = smap.byWZ[r[1]]; if (s && s.dmEmail) dms.push(s.dmEmail); });
   var live = uniq([adminEmail_(), cfg.RECON_TEAM || ''].concat(dms, [cfg.EXTRA_ALERT_TO || '']));
-  var to = test ? uniq([adminEmail_(), cfg.RECON_TEAM || '']) : live;
+  var to = opts.to ? uniq([opts.to]) : test ? uniq([adminEmail_(), cfg.RECON_TEAM || '']) : live;
   if (test) html = html.replace('TEST MODE — this alert went to the admin only.</p>',
     'TEST MODE — this alert went to the admin only.<br><span style="font-size:12px">When live it goes to ' + live.length + ' people: ' + live.join(', ') + '</span></p>');
   var via = sendMail_({ to: to.join(','), subject: subj, htmlBody: html, replyTo: test ? '' : replyTo_(cfg) });
@@ -1429,4 +1429,11 @@ function resendStoreAlerts() {
   var day = Utilities.formatDate(new Date(d + 'T12:00:00'), tz, 'EEE M/d');
   var money = function (n) { return (n < 0 ? '-$' : '$') + Math.abs(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
   sendStoreAlerts_(d, log, cfg, day, money, only);
+}
+
+/** Manual: send yesterday's recon email only to Config SEND_COPY_TO (e.g. someone just added to the list). No SM emails. */
+function sendReconCopy() {
+  var cfg = getCfg_(), tz = Session.getScriptTimeZone(), to = String(cfg.SEND_COPY_TO || '').trim();
+  if (!to) return logRun('SEND_COPY_TO is empty');
+  sendAlert_(addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), { forceLive: true, skipStores: true, to: to });
 }
