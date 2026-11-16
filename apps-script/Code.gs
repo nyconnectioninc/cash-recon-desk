@@ -1409,3 +1409,10 @@ function sendReconToDMs() {
   var tz = Session.getScriptTimeZone();
   sendAlert_(addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1), { forceLive: true, skipStores: true });
 }
+
+/** Manual: send yesterday's recon email now (from whatever Daily_Log has) and mark it sent so runDaily won't repeat it. */
+function sendTodaysReconNow() {
+  var tz = Session.getScriptTimeZone(), d = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1);
+  sendAlert_(d);
+  PropertiesService.getScriptProperties().setProperty('alert_sent_' + d, '1');
+}
