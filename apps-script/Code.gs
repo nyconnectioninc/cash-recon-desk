@@ -225,6 +225,7 @@ function ingestRQ() {
     }
     replaceRowsByDate_(TABS.RQ, RQ_HEADERS, 0, m[1], parsed);
     props.setProperty(key, '1');
+    props.setProperty('rq_recv_' + m[1], String(f.getDateCreated().getTime()));
     logRun('RQ ingested ' + f.getName() + ': ' + parsed.length + ' cashouts');
   }
 }
@@ -299,7 +300,7 @@ function ingestBrinks(query) {
         logRun('Brinks email ' + reportDate + ' skipped: ' + e.message); return;
       }
       props.setProperty('br_' + msg.getId(), reportDate);
-      addBrinksReportDate_(reportDate);
+      addBrinksReportDate_(reportDate, msg.getDate());
       t.addLabel(label);
       logRun('Brinks ingested (email ' + reportDate + '): ' + count + ' bags');
     });
@@ -619,6 +620,34 @@ function engineEnd_() {
 }
 
 // ───────────────────────── ALERT ─────────────────────────
+var EMAIL_LOGO = 'https://nyconnectioninc.github.io/cash-recon-desk/email-logo.png';
+/** When the Brinks reports and the RQ file behind a recon day arrived (falls back to Run_Log load times). */
+function reportTimes_(bizDate) {
+  var p = PropertiesService.getScriptProperties(), tz = Session.getScriptTimeZone(), rd = addDays_(bizDate, 1);
+  var br = Number(p.getProperty('br_recv_' + rd)) || 0, rq = Number(p.getProperty('rq_recv_' + bizDate)) || 0;
+  if (!br || !rq) readTab_(TABS.RUN).forEach(function (r) {
+    var t = r[0] instanceof Date ? r[0].getTime() : 0, m = String(r[1]);
+    if (!t) return;
+    if (!br && m.indexOf('Brinks ingested (email ' + rd + ')') === 0 && t > br) br = t;
+    if (!rq && m.indexOf('RQ ingested cash-audit-trail_' + bizDate) === 0) rq = t;
+  });
+  var f = function (t, withDay) { return t ? Utilities.formatDate(new Date(t), tz, withDay ? 'EEE M/d h:mm a' : 'h:mm a') : ''; };
+  return { br: f(br, true), rq: f(rq, false) };
+}
+/** Branded header bar (Option A) + optional late-deposit note, shared by the recon and store-manager emails. */
+function emailHeader_(subtitle, times) {
+  var line = [times.br ? 'Brinks reports received ' + times.br : '', times.rq ? 'RQ cash audit ' + times.rq : ''].filter(String).join(' · ');
+  return '<table width="100%" cellpadding="0" cellspacing="0" style="background:#102542;border-radius:6px 6px 0 0"><tr>' +
+    '<td style="padding:14px 18px;width:120px" width="120"><img src="' + EMAIL_LOGO + '" width="120" alt="NY Connection" style="display:block;border:0"></td>' +
+    '<td style="padding:14px 18px 14px 0"><div style="padding-left:16px;border-left:1px solid #3b4f6e">' +
+    '<div style="color:#ffffff;font:bold 20px Arial">Brinks Reconciliation Report</div>' +
+    '<div style="color:#c9d3e3;font:13px Arial;margin-top:3px">' + subtitle + '</div>' +
+    (line ? '<div style="color:#c9d3e3;font:12px Arial;margin-top:4px">🕐 ' + line + '</div>' : '') +
+    '</div></td></tr></table>' +
+    (times.br ? '<p style="margin:14px 0 12px;padding:8px 10px;background:#fef7e0;border-left:3px solid #f9ab00;font:13px Arial;color:#202124">' +
+      'Deposits Brinks recorded <b>after ' + times.br + '</b> are not in this report. Late bags are matched to the right day automatically, ' +
+      'and the store clears on a later report.</p>' : '');
+}
 function sendAlert_(bizDate, opts) {
   opts = opts || {};
   var cfg = getCfg_(), test = isTest_(cfg) && !opts.forceLive;
@@ -651,7 +680,9 @@ function sendAlert_(bizDate, opts) {
   var day = Utilities.formatDate(new Date(bizDate + 'T12:00:00'), Session.getScriptTimeZone(), 'EEE M/d');
   var subj = '💰 Cash Recon ' + day + ' — ' + groups['MISSING DEPOSIT'].length + ' missing · ' +
     (groups.SHORT.length + groups.OVER.length) + ' variance · ' + matched + '/' + total + ' matched';
-  var html = '<div style="font:14px Arial;color:#202124">' +
+  var times = reportTimes_(bizDate);
+  var html = '<div style="font:14px Arial;color:#202124;max-width:820px">' +
+    emailHeader_(day + ' · ' + matched + ' of ' + total + ' stores matched', times) +
     (test ? '<p style="background:#fff3cd;padding:8px">TEST MODE — this alert went to the admin only.</p>' : '') +
     '<p><b>' + matched + ' of ' + total + '</b> stores matched for <b>' + day + '</b>. Bags dropped the next morning are counted for the prior day; late bags update this log automatically.</p>' +
     table('❌ Missing deposit', '#c5221f', groups['MISSING DEPOSIT']) +
@@ -688,7 +719,7 @@ function sendStoreAlerts_(bizDate, log, cfg, day, money, only) {
   if (only) log = log.filter(function (r) { return only.indexOf(String(r[1]).toUpperCase()) >= 0; });
   var mode = String(cfg.SM_ALERTS || 'issues').trim().toLowerCase();
   if (mode === 'off') return;
-  var map = loadStoreMap_(), test = isTest_(cfg), out = [], noSM = [];
+  var map = loadStoreMap_(), test = isTest_(cfg), out = [], noSM = [], times = reportTimes_(bizDate);
   log.forEach(function (r) {
     var fs = String(r[16] || r[8]), base = fs.replace(/ \(adj\)$/, '');
     if (/NO ACTIVITY/.test(base)) return;
@@ -702,7 +733,8 @@ function sendStoreAlerts_(bizDate, log, cfg, day, money, only) {
     var color = open ? (base === 'MISSING DEPOSIT' ? '#c5221f' : '#e37400') : '#188038';
     var diff = Number(r[15] !== '' && r[15] != null ? r[15] : r[7]) || 0;
     var subj = (open ? '⚠️ ' : '✅ ') + r[2] + ' — ' + label + ' for ' + day + (open ? ' (' + money(diff) + ')' : '');
-    var html = '<div style="font:14px Arial;color:#202124;max-width:560px">' +
+    var html = '<div style="font:14px Arial;color:#202124;max-width:640px">' +
+      emailHeader_(r[2] + ' (' + r[1] + ') · ' + day, times) +
       '<p>Hi ' + (String(s.sm).split(/[ ,&]/)[0] || 'team') + ',</p>' +
       '<p>Here is the cash deposit check for <b>' + r[2] + '</b> (' + r[1] + ') for <b>' + day + '</b>:</p>' +
       '<table cellpadding="7" style="border-collapse:collapse;font:14px Arial;border:1px solid #e0e0e0">' +
@@ -831,9 +863,10 @@ function dataSig_() {
 }
 function rqDates_() { return readTab_(TABS.RQ).map(function (r) { return normDate_(r[0]); }).filter(function (d, i, a) { return a.indexOf(d) === i; }); }
 function brinksReportDates_() { return JSON.parse(PropertiesService.getScriptProperties().getProperty('brinks_report_dates') || '[]'); }
-function addBrinksReportDate_(d) {
-  var a = brinksReportDates_(); if (a.indexOf(d) < 0) a.push(d);
-  PropertiesService.getScriptProperties().setProperty('brinks_report_dates', JSON.stringify(a.slice(-60)));
+function addBrinksReportDate_(d, when) {
+  var a = brinksReportDates_(), p = PropertiesService.getScriptProperties(); if (a.indexOf(d) < 0) a.push(d);
+  p.setProperty('brinks_report_dates', JSON.stringify(a.slice(-60)));
+  if (when) { var t = when.getTime(), k = 'br_recv_' + d; if (t > (Number(p.getProperty(k)) || 0)) p.setProperty(k, String(t)); }
 }
 
 /** xlsx blob -> 2D values, via a temporary Google Sheets conversion (Advanced Drive service). */
