@@ -93,7 +93,8 @@ function runDaily() {
 
     try { ensureHealthTrigger_(); } catch (e) { logRun('Health trigger: ' + e.message); }
     // Config SEND_TO_DMS_NOW = yyyy-MM-dd → send that day's recon to the live list once (DMs only, no SM emails), even in TEST_MODE
-    var dmDay = normDate_(cfg.SEND_TO_DMS_NOW || ''), p0 = PropertiesService.getScriptProperties();
+    var dmRaw = String(cfg.SEND_TO_DMS_NOW || '').trim(), dmDay = /^\d{4}-\d{2}-\d{2}/.test(dmRaw) ? dmRaw.slice(0, 10)
+      : (dmRaw && !isNaN(new Date(dmRaw)) ? Utilities.formatDate(new Date(dmRaw), tz, 'yyyy-MM-dd') : ''), p0 = PropertiesService.getScriptProperties();
     if (/^\d{4}-\d{2}-\d{2}$/.test(dmDay) && p0.getProperty('dm_sent_' + dmDay) !== '1') {
       p0.setProperty('dm_sent_' + dmDay, '1');
       sendAlert_(dmDay, { forceLive: true, skipStores: true });
@@ -115,8 +116,15 @@ function runDaily() {
       // Yesterday first, so the email never waits on the older re-checks (each day takes ~1-3 min with ~100 stores
       // and a run is capped at 6 min). Older days are re-checked with whatever time is left; the next run continues.
       var t0 = now.getTime(), n = Number(cfg.RECHECK_DAYS) || 3, win = [target];
-      reconcileAndWrite_(target);
       var due = hour >= sendHour && props.getProperty('alert_sent_' + target) !== '1';
+      // Send time and yesterday was already reconciled by an earlier run today: send FIRST, so a slow or
+      // timed-out run can never hold the email back. The recon below still refreshes Daily_Log.
+      var reconAt = Number(props.getProperty('reconciled_' + target)) || 0;
+      if (due && reconAt && Utilities.formatDate(new Date(reconAt), tz, 'yyyy-MM-dd') === today) {
+        sendAlert_(target); props.setProperty('alert_sent_' + target, '1'); due = false;
+      }
+      reconcileAndWrite_(target);
+      props.setProperty('reconciled_' + target, String(Date.now()));
       if (due) netWindow_([target]);
       if (due) { sendAlert_(target); props.setProperty('alert_sent_' + target, '1'); }   // email waits for ALERT_SEND_HOUR
       for (var i = 1; i < n; i++) {
