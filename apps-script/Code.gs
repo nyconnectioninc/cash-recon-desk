@@ -668,7 +668,7 @@ function sendAlert_(bizDate, opts) {
   var to = test ? uniq([adminEmail_(), cfg.RECON_TEAM || '']) : live;
   if (test) html = html.replace('TEST MODE — this alert went to the admin only.</p>',
     'TEST MODE — this alert went to the admin only.<br><span style="font-size:12px">When live it goes to ' + live.length + ' people: ' + live.join(', ') + '</span></p>');
-  var via = sendMail_({ to: to.join(','), subject: subj, htmlBody: html, replyTo: test ? '' : adminEmail_() });
+  var via = sendMail_({ to: to.join(','), subject: subj, htmlBody: html, replyTo: test ? '' : replyTo_(cfg) });
   logRun('Alert sent for ' + bizDate + ' via ' + via + ' to ' + to.join(',') + (opts.forceLive ? ' (manual DM send)' : ''));
   if (opts.skipStores) return;
   try { sendStoreAlerts_(bizDate, log, cfg, day, money); } catch (e) { logRun('Store-manager alerts failed: ' + e); }
@@ -732,7 +732,7 @@ function sendStoreAlerts_(bizDate, log, cfg, day, money) {
   out.forEach(function (m) {
     var need = (m.to + (m.cc ? ',' + m.cc : '')).split(',').length;
     if (!mailRelay_() && MailApp.getRemainingDailyQuota() < need + 5) { skipped++; return; }   // Gmail only: keep headroom for the admin alert tomorrow
-    sendMail_({ to: m.to, cc: m.cc || '', subject: m.subj, htmlBody: m.html, replyTo: [m.cc, adminEmail_()].filter(String).join(',') });
+    sendMail_({ to: m.to, cc: m.cc || '', subject: m.subj, htmlBody: m.html, replyTo: [m.cc, replyTo_(getCfg_())].filter(String).join(',') });
     sent++;
   });
   logRun('SM alerts for ' + bizDate + ': ' + sent + ' sent' + (skipped ? ', ' + skipped + ' skipped (daily email quota)' : '') +
@@ -788,6 +788,8 @@ function adminMail_(subject, text) {
   return sendMail_({ to: adminEmail_(), subject: subject, body: String(text || ''),
     htmlBody: '<div style="font-family:Arial,sans-serif;font-size:14px;white-space:pre-wrap">' + esc + '</div>' });
 }
+/** Who replies to the recon / store-manager emails go to (Config REPLY_TO, comma-separated; default the admin). */
+function replyTo_(cfg) { return String((cfg && cfg.REPLY_TO) || '').trim() || adminEmail_(); }
 function adminEmail_() { return getCfg_().ADMIN_EMAIL || Session.getEffectiveUser().getEmail(); }
 
 function loadStoreMap_() {
