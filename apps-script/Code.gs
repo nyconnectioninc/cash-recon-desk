@@ -684,7 +684,8 @@ var SM_ACTION = {
   'OVER': 'Your Brinks bag is MORE than the RQ cashout. Check whether cash from another day was included and reply with the explanation.',
   'BRINKS ONLY': 'A Brinks bag was received but there is no RQ cashout for this day. Make sure the cash audit was completed in RQ and reply with the details.'
 };
-function sendStoreAlerts_(bizDate, log, cfg, day, money) {
+function sendStoreAlerts_(bizDate, log, cfg, day, money, only) {
+  if (only) log = log.filter(function (r) { return only.indexOf(String(r[1]).toUpperCase()) >= 0; });
   var mode = String(cfg.SM_ALERTS || 'issues').trim().toLowerCase();
   if (mode === 'off') return;
   var map = loadStoreMap_(), test = isTest_(cfg), out = [], noSM = [];
@@ -1417,4 +1418,15 @@ function sendTodaysReconNow() {
   var tz = Session.getScriptTimeZone(), d = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1);
   sendAlert_(d);
   PropertiesService.getScriptProperties().setProperty('alert_sent_' + d, '1');
+}
+
+/** Manual: resend yesterday's store-manager emails only for the stores in Config RESEND_SM (comma-separated WZ #s),
+ *  e.g. after fixing a bounced address. Does not resend the main recon. */
+function resendStoreAlerts() {
+  var cfg = getCfg_(), tz = Session.getScriptTimeZone(), d = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1);
+  var only = String(cfg.RESEND_SM || '').toUpperCase().split(/[,\s]+/).filter(String); if (!only.length) return logRun('RESEND_SM is empty');
+  var log = readTab_(TABS.LOG).filter(function (r) { return normDate_(r[0]) === d; });
+  var day = Utilities.formatDate(new Date(d + 'T12:00:00'), tz, 'EEE M/d');
+  var money = function (n) { return (n < 0 ? '-$' : '$') + Math.abs(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  sendStoreAlerts_(d, log, cfg, day, money, only);
 }
