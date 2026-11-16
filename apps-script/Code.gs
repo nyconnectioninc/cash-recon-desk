@@ -720,7 +720,7 @@ var SM_ACTION = {
   'OVER': 'Your Brinks bag is MORE than the RQ cashout. Check whether cash from another day was included and reply with the explanation.',
   'BRINKS ONLY': 'A Brinks bag was received but there is no RQ cashout for this day. Make sure the cash audit was completed in RQ and reply with the details.'
 };
-function sendStoreAlerts_(bizDate, log, cfg, day, money, only) {
+function sendStoreAlerts_(bizDate, log, cfg, day, money, only, previewTo) {
   if (only) log = log.filter(function (r) { return only.indexOf(String(r[1]).toUpperCase()) >= 0; });
   var mode = String(cfg.SM_ALERTS || 'issues').trim().toLowerCase();
   if (mode === 'off') return;
@@ -755,6 +755,11 @@ function sendStoreAlerts_(bizDate, log, cfg, day, money, only) {
     out.push({ to: s.smEmail, cc: s.dmEmail, subj: subj, html: html });
   });
   if (!out.length && !noSM.length) return;
+  if (previewTo) {   // sample only: send these store emails to one address, nobody else
+    out.forEach(function (m) { sendMail_({ to: previewTo, subject: '[SAMPLE → ' + m.to + '] ' + m.subj, htmlBody: m.html }); });
+    logRun('SM sample for ' + bizDate + ': ' + out.length + ' email(s) to ' + previewTo);
+    return;
+  }
   if (test) {
     var prev = '<div style="font:14px Arial"><p style="background:#fff3cd;padding:8px">TEST MODE — preview of the ' + out.length +
       ' store-manager email(s) that WOULD go out for ' + day + '. Nothing was sent to stores.</p>' +
@@ -1467,6 +1472,17 @@ function resendStoreAlerts() {
   var day = Utilities.formatDate(new Date(d + 'T12:00:00'), tz, 'EEE M/d');
   var money = function (n) { return (n < 0 ? '-$' : '$') + Math.abs(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
   sendStoreAlerts_(d, log, cfg, day, money, only);
+}
+
+/** Manual: send samples of yesterday's store-manager emails for the stores in Config RESEND_SM to Config SEND_COPY_TO only. */
+function sendSmSample() {
+  var cfg = getCfg_(), tz = Session.getScriptTimeZone(), d = addDays_(Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), -1);
+  var to = String(cfg.SEND_COPY_TO || '').trim(), only = String(cfg.RESEND_SM || '').toUpperCase().split(/[,\s]+/).filter(String);
+  if (!to || !only.length) return logRun('sendSmSample needs SEND_COPY_TO and RESEND_SM');
+  var log = readTab_(TABS.LOG).filter(function (r) { return normDate_(r[0]) === d; });
+  var day = Utilities.formatDate(new Date(d + 'T12:00:00'), tz, 'EEE M/d');
+  var money = function (n) { return (n < 0 ? '-$' : '$') + Math.abs(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  sendStoreAlerts_(d, log, cfg, day, money, only, to);
 }
 
 /** Manual: send yesterday's recon email only to Config SEND_COPY_TO (e.g. someone just added to the list). No SM emails. */
