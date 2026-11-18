@@ -143,9 +143,14 @@ function runDaily() {
       props.setProperty('missing_sent_' + target, '1');
       logRun('Missing inputs for ' + target + ': ' + miss.join(' | '));
     }
+    PropertiesService.getScriptProperties().deleteProperty('transient_errs');   // clean run
   } catch (e) {
     logRun('ERROR ' + e.message + '\n' + e.stack);
-    adminMail_( '❌ Cash Recon error', e.message + '\n\n' + e.stack);
+    // Google-side hiccups (Sheets/Drive timed out, server error) clear on the next 15-min run: email only if 3 runs in a row fail.
+    var transient = /Service \w+ (timed out|failed)|Server error|try again later|temporarily unavailable|Address unavailable/i.test(e.message);
+    var p2 = PropertiesService.getScriptProperties(), n = transient ? (Number(p2.getProperty('transient_errs')) || 0) + 1 : 0;
+    if (transient) p2.setProperty('transient_errs', String(n));
+    if (!transient || n === 3) adminMail_( '❌ Cash Recon error' + (transient ? ' (3 runs in a row)' : ''), e.message + '\n\n' + e.stack);
   } finally {
     engineEnd_();
   }
